@@ -1,3 +1,19 @@
 {
-    "cmake.configureOnOpen": true
+    "cmake.configureOnOpen": true,
+    "sqltools.connections": [
+        {
+            "database": "nestudent",
+            "driver": "PostgreSQL",
+            "group": "ne-student",
+            "name": "ne-student-db",
+            "password": "postgres",
+            "pgOptions": {
+                "ssl": false
+            },
+            "port": 5433,
+            "previewLimit": 50,
+            "server": "localhost",
+            "username": "postgres"
+        }
+    ]
 }

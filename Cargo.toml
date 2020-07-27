@@ -15,3 +15,6 @@ actix-rt = "1"
 sqlx = { version = "0.3", features = [ "postgres" ] }
 anyhow = "1.0.28"
 listenfd = "0.3.3"
+sqlx-pg-migrate = "1.0"
+include_dir = "0.6.0"
+dotenv = "0.6.0"
