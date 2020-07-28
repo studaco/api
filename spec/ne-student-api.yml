@@ -1,0 +1,34 @@
+openapi: 3.0.3
+info:
+  title: Ne Student
+  version: 0.1.0
+  description: Everything related with ne-student service
+servers:
+  - url: 'http://localhost:8800'
+paths:
+  /auth/login:
+    post:
+      description: Generate access token from login credentials
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: 'requests.json#/definitions/Login'
+            examples:
+              example:
+                value:
+                  $ref: 'examples.json#/login'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: 'responses.json#/definitions/Login'
+              examples:
+                success:
+                  value:
+                    $ref: 'examples.json#/loginSuccess'
+                failure:
+                  value:
+                    $ref: 'examples.json#/loginFailure'

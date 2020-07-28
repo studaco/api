@@ -1,2 +1,5 @@
 /target
 .env
+/spec/*.json
+node_modules
+.DS_Store

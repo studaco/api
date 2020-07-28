@@ -1,0 +1,15 @@
+[tasks.schema]
+script = [
+    "typescript-json-schema spec/requests.ts '*' -o spec/requests.json",
+    "typescript-json-schema spec/responses.ts '*' -o spec/responses.json",
+    "node scripts/genExamples.js spec/examples.ts"
+]
+
+[tasks.dev]
+script = [
+    "source .env",
+    "systemfd --no-pid -s http::$PORT -- cargo watch -x run"
+]
+
+[tasks.clear]
+script = ["rm spec/*.json"]
