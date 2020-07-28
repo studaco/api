@@ -2,7 +2,7 @@
 script = [
     "typescript-json-schema spec/requests.ts '*' -o spec/requests.json",
     "typescript-json-schema spec/responses.ts '*' -o spec/responses.json",
-    "node scripts/genExamples.js spec/examples.ts"
+    "./scripts/genExamples.js spec/examples.ts"
 ]
 
 [tasks.dev]
