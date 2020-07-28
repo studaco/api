@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
 
 use crate::error::APIError;
-use crate::model::account::{get_account_by_login};
+use crate::model::account::get_account_by_login;
 use crate::payload::Payload;
 use crate::token::generate_token;
 
@@ -28,13 +28,13 @@ pub async fn login(
 
     let account = match account {
         Some(account) => account,
-        None => return Err(APIError::UserDoesNotExist)
+        None => return Err(APIError::UserDoesNotExist),
     };
 
     let verification = bcrypt::verify(password, &account.password_hash[..])?;
 
     if !verification {
-        return Err(APIError::InvalidCredentials)
+        return Err(APIError::InvalidCredentials);
     }
 
     Ok(AccessTokenResponse {

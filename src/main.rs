@@ -7,10 +7,10 @@ use sqlx::postgres::PgPool;
 use sqlx_pg_migrate::migrate;
 use std::env;
 
-pub mod model;
-mod routes;
 mod error;
+pub mod model;
 mod payload;
+mod routes;
 mod token;
 use routes::*;
 

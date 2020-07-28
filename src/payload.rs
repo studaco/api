@@ -23,7 +23,10 @@ where
     }
 }
 
-impl <T> From<T> for Payload<T> where T: Serialize {
+impl<T> From<T> for Payload<T>
+where
+    T: Serialize,
+{
     fn from(payload: T) -> Self {
         Payload { payload }
     }

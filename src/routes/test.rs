@@ -32,11 +32,16 @@ pub async fn register(
     db: web::Data<PgPool>,
     registration: web::Json<RegistrationInfo>,
 ) -> HttpResponse {
-    let RegistrationInfo { first_name, last_name, login, password } = registration.into_inner();
+    let RegistrationInfo {
+        first_name,
+        last_name,
+        login,
+        password,
+    } = registration.into_inner();
     let result = register_account(db.get_ref(), first_name, last_name, login, password).await;
 
     match result {
         Ok(account) => HttpResponse::Ok().json(account),
-        Err(err) => HttpResponse::InternalServerError().body(format!("{}", err))
+        Err(err) => HttpResponse::InternalServerError().body(format!("{}", err)),
     }
 }

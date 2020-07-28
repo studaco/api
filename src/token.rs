@@ -1,13 +1,13 @@
+use hmac::{Hmac, NewMac};
+use jwt::{Error, SignWithKey};
+use serde::{Deserialize, Serialize};
+use sha2::Sha256;
 use std::env;
 use uuid::Uuid;
-use hmac::{Hmac, NewMac};
-use sha2::Sha256;
-use jwt::{SignWithKey, Error};
-use serde::{Serialize, Deserialize};
 
 #[derive(Serialize, Deserialize)]
 struct Claim {
-    id: Uuid
+    id: Uuid,
 }
 
 pub fn generate_token(id: Uuid) -> Result<String, Error> {

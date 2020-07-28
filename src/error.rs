@@ -1,10 +1,10 @@
 use actix_http::ResponseBuilder;
 use actix_web::{http::StatusCode, HttpResponse, ResponseError};
 use bcrypt::BcryptError;
+use jwt;
 use serde::Serialize;
 use sqlx;
 use std::fmt::{Display, Formatter};
-use jwt;
 
 #[derive(Serialize, Debug)]
 #[serde(tag = "type")]
@@ -25,7 +25,7 @@ impl Display for APIError {
             },
             APIError::UserDoesNotExist => write!(f, "User deos not exist"),
             APIError::InvalidCredentials => write!(f, "Invalid creatials"),
-            APIError::InvalidToken => f.write_str("Invalid token")
+            APIError::InvalidToken => f.write_str("Invalid token"),
         }
     }
 }
@@ -37,7 +37,7 @@ impl ResponseError for APIError {
         match self {
             APIError::InternalError { message: _ } => StatusCode::INTERNAL_SERVER_ERROR,
             APIError::UserDoesNotExist => StatusCode::NOT_FOUND,
-            APIError::InvalidCredentials | APIError::InvalidToken => StatusCode::UNAUTHORIZED
+            APIError::InvalidCredentials | APIError::InvalidToken => StatusCode::UNAUTHORIZED,
         }
     }
 
