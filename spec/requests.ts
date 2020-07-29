@@ -1,4 +1,4 @@
-import { NamedEntity, Repeat, TaskID, LessonID, TeacherID, UserID } from "./common"
+import { NamedEntity, Repeat, TaskID, LessonID, TeacherID, UserID, EntityID, EntityType } from "./common"
 
 export interface Login {
     login: string
@@ -25,8 +25,14 @@ export interface AddTeacher extends NamedEntity {}
 
 export interface AddPermission {
     type: "r" | "rw"
-    entity_type: "task" | "lesson" | "teacher"
-    entity_id: TaskID | LessonID | TeacherID
+    entity_type: EntityType
+    /**
+     * @format uuid
+     */
+    entity_id: EntityID
+    /**
+     * @format uuid
+     */
     user_id: UserID
 }
 

@@ -3,21 +3,54 @@ info:
   title: Ne Student
   version: 0.1.0
   description: Everything related with ne-student service
+  contact:
+    name: Yaroslav (API developer)
+    email: q.link0.p@gmail.com
+externalDocs:
+  url: https://github.com/Malien/ne-student-api
+  description: An API repo, containing both spec, and it's implementation
+tags:
+  - name: auth
+    x-displayName: Authentication API
+    description: Authentication APIs, covering needs for login, registration, password reset and token invalidation
+  - name: permissions
+    x-displayName: Permissions
+    description: Manage access to different entities (lessons, teachers, tasks)
+  - name: lesson
+    x-displayName: Lesson
+    description: Everyhting related to lesson retrieval and manipulation
+  - name: teacher
+    x-displayName: Teacher
+    description: Everyhting related to teacher retrieval and manipulation
+  - name: task
+    x-displayName: Task
+    description: Everyhting related to task retrieval and manipulation
+  - name: retrieval
+    x-displayName: Data fetching
+    description: APIs that allow to fetch different enteties
+  - name: manipulation
+    x-displayName: Data manipulation
+    description: APIs that allow changing and deleting data resources
 servers:
   - url: 'http://localhost:8800'
 paths:
+
   /auth/login:
     post:
+      tags: 
+        - auth
+      summary: Login user via login and password
       description: Generate access token from login credentials
+      operationId: auth-login
+
       requestBody:
         content:
           application/json:
             schema:
               $ref: 'requests.json#/definitions/Login'
-            examples:
-              example:
-                value:
-                  $ref: 'examples.json#/login'
+            example:
+              $ref: 'examples.json#/login'
+
       responses:
         '200':
           description: OK
@@ -25,10 +58,306 @@ paths:
             application/json:
               schema:
                 $ref: 'responses.json#/definitions/Login'
+              example:
+                $ref: 'examples.json#/loginSuccess'
+        '401':
+          $ref: '#/components/responses/unauthorized'
+        '500':
+          $ref: '#/components/responses/internalError'
+
+  /auth/register:
+    post:
+      tags: 
+        - auth
+      summary: Register a new user
+      description: Create a new user
+      operationId: auth-register
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: 'requests.json#/definitions/Register'
+            examples:
+              Fully specified registration:
+                value:
+                  $ref: 'examples.json#/register'
+              Without last name:
+                value:
+                  $ref: 'examples.json#/registerWithoutName'
+
+      responses:
+        '200':
+          description: Ok
+          content:
+            application/json:
+              schema:
+                $ref: 'responses.json#/definitions/Register'
               examples:
-                success:
+                Success:
                   value:
-                    $ref: 'examples.json#/loginSuccess'
-                failure:
+                    $ref: 'examples.json#/registerSuccess'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: 'errors.json#/definitions/SingleUserDoesNotExist'
+              examples:
+                User does not exist:
                   value:
-                    $ref: 'examples.json#/loginFailure'
+                    $ref: 'examples.json#/registerFailure'
+        '500':
+          $ref: '#/components/responses/internalError'
+
+  /lesson/{id}:
+    parameters:
+      - name: id
+        required: true
+        in: path
+        example: "a7262da1-33ed-448c-8b7d-97263d0974f7"
+        schema:
+          $ref: 'common.json#/definitions/LessonID'
+      - name: Authorization
+        in: header
+        required: true
+        schema: { type: "string", format: bearer }
+
+    put:
+      tags:
+        - lesson
+        - manipulation
+      summary: Create new Lesson
+      description: |
+        Create new Lesson. User will be automatically assigned read-write permissions
+        to the newly created lesson.
+      operationId: put-lesson
+      security:
+        - bearerAuth: [ ]
+      
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: 'requests.json#/definitions/AddLesson'
+            example:
+              $ref: 'examples.json#/addLesson'
+      
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: 
+                $ref: 'responses.json#/definitions/NewLesson'
+              example:
+                $ref: 'examples.json#/getLesson'
+        '401':
+          $ref: '#/components/responses/unauthorized'
+    
+    patch:
+      tags:
+        - lesson
+        - manipulation
+      summary: Create new Lesson
+      description: |
+        Create new Lesson. User will be automatically assigned read-write permissions
+        to the newly created lesson.
+      operationId: patch-lesson
+      security:
+        - bearerAuth: [ ]
+      
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: 'requests.json#/definitions/UpdateLesson'
+            example:
+              $ref: 'examples.json#/addLesson'
+      
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: 
+                $ref: 'responses.json#/definitions/NewLesson'
+              example:
+                $ref: 'examples.json#/getLesson'
+        '401':
+          $ref: '#/components/responses/unauthorized'
+        '403':
+          $ref: '#/components/responses/noLessonWriteAccess'
+    
+    get:
+      tags:
+        - retrieval
+        - lesson
+      summary: Fetch a single lesson
+      description: Retrieve a lesson by its ID
+      operationId: get-lesson
+      security:
+        - bearerAuth: [ ]
+
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: 'responses.json#/definitions/GetLesson'
+              example:
+                $ref: 'examples.json#/getLesson'
+        '401':
+          $ref: '#/components/responses/unauthorized'
+        '404':
+          $ref: '#/components/responses/lessonNotFound'
+        '403':
+          $ref: '#/components/responses/noLessonReadAccess'
+        '500':
+          $ref: '#/components/responses/internalError'
+    
+    delete:
+      tags:
+        - manipulation
+        - lesson
+      summary: Delete a lesson
+      description: Delete a single lesson by its ID
+      operationId: delete-lesson
+      security:
+        - bearerAuth: [ ]
+
+      responses:
+        '203':
+          description: OK (No content)
+        '401':
+          $ref: '#/components/responses/unauthorized'
+        '403':
+          $ref: '#/components/responses/noLessonWriteAccess'
+        '404':
+          $ref: '#/components/responses/lessonNotFound'
+        '500':
+          $ref: '#/components/responses/internalError'
+      
+  /lessons:
+    parameters:
+      - name: date
+        in: query
+        schema: { type: string }
+        description: Date at which lessons are scheduled. Formatted as DD/MM/YYYY
+        example: 01/16/2001
+    
+    get:
+      tags:
+        - retrieval
+        - lesson
+      summary: Fetch list of lessons
+      description: |
+        Retrieve list of the lessons, filtered by the query parameters.
+        If user doesn't have permissions to read certain lessons, they won't be returned by the API
+      security:
+        - bearerAuth: [ ]
+
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: 'responses.json#/definitions/GetLessonList'
+              examples:
+                Populated list:
+                  value:
+                    $ref: 'examples.json#/lessonList'
+                No lessons found:
+                  value:
+                    $ref: 'examples.json#/emptyList'
+        '401':
+          $ref: '#/components/responses/unauthorized'
+        '500':
+          $ref: '#/components/responses/internalError'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: |
+        Token is returned by the `/login` and `/register` API calls.
+        This token is expected to be present in the `Authorization` http header in form of `Bearer <token>`.
+
+        So if the token returned by the `/login` call is `someLongTokenStringWithNumbersAndWierdSymbols`.
+        The `Authorization` header should be `Bearer someLongTokenStringWithNumbersAndWierdSymbols`.
+
+        Authentication tokes are JWTs which are cryptographically secured and contain a bit of information to identify user at the back-end.
+
+  responses:
+
+    invalidCredentials:
+      description: Unauthorized
+      content:
+        application/json:
+          schema:
+            $ref: 'errors.json#/definitions/SingleInvalidCredentials'
+          examples:
+            Invalid Credentials:
+              value:
+                $ref: 'examples.json#/loginFailure'
+
+    internalError:
+      description: Internal Server Error
+      content:
+        application/json:
+          schema:
+            $ref: 'errors.json#/definitions/SingleInternalError'
+          examples:
+            Internal Server Error:
+              value:
+                $ref: 'examples.json#/internalError'
+
+    lessonNotFound:
+      description: Lesson not found
+      content:
+        application/json:
+          schema:
+            $ref: 'errors.json#/definitions/SingleLessonDoesNotExist'
+          example:
+            $ref: 'examples.json#/lessonNotFound'
+
+    unauthorized:
+      description: Access token is missing, invalid or expired
+      content:
+        application/json:
+          schema: 
+            $ref: 'errors.json#/definitions/Unauthorized'
+          examples:
+            Token is missing:
+              value:
+                $ref: 'examples.json#/noTokenPresent'
+            Invalid token:
+              value:
+                $ref: 'examples.json#/invalidToken'
+            Token expired:
+              value:
+                $ref: 'examples.json#/tokenExpired'
+            Token revoked:
+              value:
+                $ref: 'examples.json#/tokenRevoked'
+
+    noLessonReadAccess:
+      description: No read access
+      content:
+        application/json:
+          schema:
+            $ref: 'errors.json#/definitions/SingleLessonNoReadAccess'
+          example:
+            $ref: 'examples.json#/noLessonReadAccess'
+
+    noLessonWriteAccess:
+      description: No write access
+      content:
+        application/json:
+          schema:
+            $ref: 'errors.json#/definitions/SingleLessonNoWriteAccess'
+          example:
+            $ref: 'examples.json#/noLessonWriteAccess'

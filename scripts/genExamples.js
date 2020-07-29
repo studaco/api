@@ -1,9 +1,8 @@
-#!node
 const { transpile } = require("typescript")
 const { readFile, writeFile } = require("fs")
 const stringify = require("json-stable-stringify")
 
-process.argv.slice(1).forEach(path => {
+process.argv.slice(2).forEach(path => {
     readFile(path, (err, res) => {
         if (err) {
             console.error(err)

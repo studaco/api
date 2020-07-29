@@ -1,8 +1,10 @@
 [tasks.schema]
 script = [
-    "typescript-json-schema spec/requests.ts '*' -o spec/requests.json",
-    "typescript-json-schema spec/responses.ts '*' -o spec/responses.json",
-    "./scripts/genExamples.js spec/examples.ts"
+    "typescript-json-schema spec/requests.ts '*' -o spec/requests.json --strictNullChechs --required",
+    "typescript-json-schema spec/responses.ts '*' -o spec/responses.json --strictNullChechs --required",
+    "typescript-json-schema spec/errors.ts '*' -o spec/errors.json --strictNullChechs --required",
+    "typescript-json-schema spec/common.ts '*' -o spec/common.json --strictNullChechs --required",
+    "node scripts/genExamples.js spec/examples.ts"
 ]
 
 [tasks.dev]
