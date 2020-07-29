@@ -31,6 +31,20 @@ tags:
   - name: manipulation
     x-displayName: Data manipulation
     description: APIs that allow changing and deleting data resources
+x-tagGroups:
+  - name: Genral
+    tags:
+      - auth
+      - permissions
+  - name: Entities
+    tags:
+      - lesson
+      - teacher
+      - task
+  - name: Access types
+    tags:
+      - retrieval
+      - manipulation
 servers:
   - url: 'http://localhost:8800'
 paths:
