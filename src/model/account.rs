@@ -101,8 +101,3 @@ pub async fn register_account(
         password_hash: hash,
     })
 }
-
-// 200 Ok           -> { ... }
-// 400 BadRequest   -> { type: "", msg: "" }
-// 400 BadRequest   -> { error: { type: "", msg: "" } }
-// 200 Ok           -> { payload: { ... } }

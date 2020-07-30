@@ -38,6 +38,12 @@ export type IDOf<Entity extends EntityType> = Entity extends "teacher"
     ? LessonID
     : TaskID
 
+/**
+ * @format jwt
+ * @pattern [a-zA-Z0-9]{18,24}\.[a-zA-Z0-9]{42,56}\.[a-zA-Z0-9]{32,40}
+ */
+export type JWT = string
+
 export type Monday = 1
 export type Tuesday = 2
 export type Wednesday = 3
@@ -169,7 +175,8 @@ export interface Lesson {
     /**
      * @description Array of Teacher IDs
      * @abstract if you have read access to the lesson, you get read access to the teachers assigned to it
-     * @item.format uuid
+     * @items.format uuid
+     * @items.type string
      */
     teachers: TeacherID[]
     description?: string

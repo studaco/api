@@ -58,3 +58,5 @@ export type SingleTokenRevoked = Error<TokenRevoked>
 export type SingleLessonNoReadAccess = SingleNoReadAccess<"lesson">
 export type SingleLessonNoWriteAccess = SingleNoWriteAccess<"lesson">
 // export type SingleLessonNoAdminPermissions = SingleNoAdminPermissions<"lesson">
+
+export type SingleUnauthorized = Error<Unauthorized>

@@ -157,8 +157,8 @@ paths:
               $ref: 'examples.json#/addLesson'
       
       responses:
-        '200':
-          description: OK
+        '201':
+          description: Created
           content:
             application/json:
               schema: 
@@ -241,7 +241,7 @@ paths:
         - bearerAuth: [ ]
 
       responses:
-        '203':
+        '204':
           description: OK (No content)
         '401':
           $ref: '#/components/responses/unauthorized'
@@ -343,7 +343,7 @@ components:
       content:
         application/json:
           schema: 
-            $ref: 'errors.json#/definitions/Unauthorized'
+            $ref: 'errors.json#/definitions/SingleUnauthorized'
           examples:
             Token is missing:
               value:

@@ -2,11 +2,17 @@ import { NamedEntity, Repeat, TaskID, LessonID, TeacherID, UserID, EntityID, Ent
 
 export interface Login {
     login: string
+    /**
+     * @format password
+     */
     password: string
 }
 
 export interface Register extends NamedEntity {
     login: string
+    /**
+     * @format password
+     */
     password: string
 }
 

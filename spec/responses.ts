@@ -1,6 +1,10 @@
-import { Payload, Lesson } from "./common"
+import { Payload, Lesson, JWT } from "./common"
 
-export type Login = Payload<{ access_token: string }>
+export type TokenResponse = {
+    access_token: JWT
+}
+
+export type Login = Payload<TokenResponse>
 
 export type Register = Login
 
