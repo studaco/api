@@ -1,16 +1,22 @@
 [tasks.schema]
 script = [
-    "typescript-json-schema spec/requests.ts '*' -o spec/requests.json --strictNullChechs --required",
-    "typescript-json-schema spec/responses.ts '*' -o spec/responses.json --strictNullChechs --required",
-    "typescript-json-schema spec/errors.ts '*' -o spec/errors.json --strictNullChechs --required",
-    "typescript-json-schema spec/common.ts '*' -o spec/common.json --strictNullChechs --required",
-    "node scripts/genExamples.js spec/examples.ts"
+    "yarn schema spec/requests.ts '*' -o spec/requests.json --strictNullChechs --required &",
+    "yarn schema spec/responses.ts '*' -o spec/responses.json --strictNullChechs --required &",
+    "yarn schema spec/errors.ts '*' -o spec/errors.json --strictNullChechs --required &",
+    "yarn schema spec/common.ts '*' -o spec/common.json --strictNullChechs --required &",
+    "yarn examples spec/examples.ts",
+    "wait"
 ]
 
 [tasks.dev]
 script = [
     "source .env",
     "systemfd --no-pid -s http::$PORT -- cargo watch -x run"
+]
+
+[tasks.docs]
+script = [
+    "yarm redoc --watch spec/ne-student-api.yml"
 ]
 
 [tasks.clear]

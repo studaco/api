@@ -7,7 +7,9 @@
   "license": "MIT",
   "private": true,
   "scripts": {
-    "redoc": "redoc-cli"
+    "redoc": "redoc-cli",
+    "schema": "typescript-json-schema",
+    "examples": "node scripts/genExamples.js"
   },
   "devDependencies": {
     "@types/json-stable-stringify": "^1.0.32",
