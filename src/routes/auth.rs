@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
 
 use crate::error::APIError;
-use crate::model::account::get_account_by_login;
+use crate::model::account::{get_account_by_login, register_account};
 use crate::payload::Payload;
 use crate::token::generate_token;
 
@@ -36,6 +36,41 @@ pub async fn login(
     if !verification {
         return Err(APIError::InvalidCredentials);
     }
+
+    Ok(AccessTokenResponse {
+        access_token: generate_token(account.id)?,
+    }
+    .into())
+}
+
+#[derive(Deserialize)]
+pub struct RegistrationData {
+    login: String,
+    password: String,
+    first_name: String,
+    last_name: Option<String>,
+}
+
+#[post("/auth/register")]
+pub async fn register(
+    db: web::Data<PgPool>,
+    registration_data: web::Json<RegistrationData>,
+) -> Result<Payload<AccessTokenResponse>, APIError> {
+    let RegistrationData {
+        login: registration_login,
+        password,
+        first_name,
+        last_name,
+    } = registration_data.into_inner();
+
+    let account = register_account(
+        db.get_ref(),
+        first_name,
+        last_name,
+        registration_login,
+        password,
+    )
+    .await?;
 
     Ok(AccessTokenResponse {
         access_token: generate_token(account.id)?,

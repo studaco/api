@@ -1491,13 +1491,13 @@ dependencies = [
  "include_dir",
  "json",
  "jwt",
- "lazy_static",
  "listenfd",
  "serde",
  "serde_json",
  "sha2 0.9.1",
  "sqlx",
  "sqlx-pg-migrate",
+ "thiserror",
  "uuid 0.8.1",
 ]
 

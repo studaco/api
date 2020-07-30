@@ -34,14 +34,14 @@ export const loginFailure: Error<InvalidCredentials> = {
 }
 
 export const register: RegisterRequest = {
-    firstName: "John",
-    lastName: "Appleseed",
+    first_name: "John",
+    last_name: "Appleseed",
     login: "johny",
     password: "LegitPassword",
 }
 
 export const registerWithoutName: RegisterRequest = {
-    firstName: "John",
+    first_name: "John",
     login: "johny",
     password: "LegitPassword",
 }

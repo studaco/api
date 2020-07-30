@@ -1,8 +1,10 @@
-use anyhow;
-use bcrypt;
+use bcrypt::{BcryptError};
 use serde::Serialize;
-use sqlx::{postgres::PgQueryAs, PgPool, Result};
+use sqlx::{postgres::PgQueryAs, PgPool};
 use uuid::Uuid;
+use thiserror::Error;
+
+use crate::error::APIError;
 
 #[derive(Debug, Serialize)]
 pub struct Account {
@@ -13,7 +15,7 @@ pub struct Account {
     pub password_hash: String,
 }
 
-pub async fn get_account_by_id(db: &PgPool, id: Uuid) -> Result<Option<Account>> {
+pub async fn get_account_by_id(db: &PgPool, id: Uuid) -> sqlx::Result<Option<Account>> {
     sqlx::query_as!(
         Account,
         r#"SELECT id, first_name, last_name, login, password_hash 
@@ -24,7 +26,7 @@ pub async fn get_account_by_id(db: &PgPool, id: Uuid) -> Result<Option<Account>>
     .await
 }
 
-pub async fn get_account_by_login(db: &PgPool, login: String) -> Result<Option<Account>> {
+pub async fn get_account_by_login(db: &PgPool, login: String) -> sqlx::Result<Option<Account>> {
     sqlx::query_as!(
         Account,
         r#"SELECT id, first_name, last_name, login, password_hash 
@@ -35,14 +37,47 @@ pub async fn get_account_by_login(db: &PgPool, login: String) -> Result<Option<A
     .await
 }
 
+#[derive(Error, Debug)]
+pub enum RegistrationError {
+    #[error("Login is no unique")]
+    LoginNotUnique,
+    #[error("{0}")]
+    Database(#[from] sqlx::Error),
+    #[error("{0}")]
+    Bcrypt(#[from] BcryptError)
+}
+
+impl From<RegistrationError> for APIError {
+    fn from(err: RegistrationError) -> Self {
+        match err {
+            RegistrationError::LoginNotUnique => APIError::LoginAlreadyPresent,
+            RegistrationError::Database(error) => error.into(),
+            RegistrationError::Bcrypt(error) => error.into()
+        }
+    }
+}
+
 pub async fn register_account(
     db: &PgPool,
     first_name: String,
     last_name: Option<String>,
     login: String,
     password: String,
-) -> anyhow::Result<Account> {
+) -> Result<Account, RegistrationError> {
     let hash = bcrypt::hash(password, 8)?;
+
+    let mut transaction = db.begin().await?;
+    let (count,): (i64,) = sqlx::query_as(
+        r#"SELECT count(*) FROM Account WHERE login = $1"#
+    )
+    .bind(&login)
+    .fetch_one(&mut transaction)
+    .await?;
+
+    if count == 1 {
+        return Err(RegistrationError::LoginNotUnique)
+    }
+
     let (id,): (Uuid,) = sqlx::query_as(
         r#"INSERT 
         INTO Account (first_name, last_name, login, password_hash)
@@ -53,8 +88,10 @@ pub async fn register_account(
     .bind(&last_name)
     .bind(&login)
     .bind(&hash)
-    .fetch_one(db)
+    .fetch_one(&mut transaction)
     .await?;
+
+    transaction.commit().await?;
 
     Ok(Account {
         id,

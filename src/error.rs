@@ -4,52 +4,47 @@ use bcrypt::BcryptError;
 use jwt;
 use serde::Serialize;
 use sqlx;
-use std::fmt::{Display, Formatter};
+use thiserror::Error;
 
-#[derive(Serialize, Debug)]
+#[derive(Error, Serialize, Debug, Clone)]
 #[serde(tag = "type")]
 #[serde(rename_all = "snake_case")]
 pub enum APIError {
-    InternalError { message: Option<String> },
+    #[error("Internal server error ({message})")]
+    InternalError { message: String },
+    #[error("User does not exist")]
     UserDoesNotExist,
+    #[error("Invalid credentials")]
     InvalidCredentials,
+    #[error("Invalid token")]
     InvalidToken,
+    #[error("Login already present")]
+    LoginAlreadyPresent
 }
 
-impl Display for APIError {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        match self {
-            APIError::InternalError { message } => match message {
-                Some(str) => write!(f, "Internal server error ({})", str),
-                None => f.write_str("Internal server error"),
-            },
-            APIError::UserDoesNotExist => write!(f, "User deos not exist"),
-            APIError::InvalidCredentials => write!(f, "Invalid creatials"),
-            APIError::InvalidToken => f.write_str("Invalid token"),
-        }
-    }
+#[derive(Serialize)]
+struct ErrorWrapper {
+    error: APIError
 }
-
-impl std::error::Error for APIError {}
 
 impl ResponseError for APIError {
     fn status_code(&self) -> StatusCode {
         match self {
             APIError::InternalError { message: _ } => StatusCode::INTERNAL_SERVER_ERROR,
             APIError::UserDoesNotExist => StatusCode::NOT_FOUND,
-            APIError::InvalidCredentials | APIError::InvalidToken => StatusCode::UNAUTHORIZED,
+            APIError::InvalidCredentials | APIError::InvalidToken | APIError::LoginAlreadyPresent => StatusCode::UNAUTHORIZED,
         }
     }
 
     fn error_response(&self) -> HttpResponse {
-        ResponseBuilder::new(self.status_code()).json(self)
+        ResponseBuilder::new(self.status_code()).json(ErrorWrapper { error: self.clone() })
     }
 }
 
 impl From<sqlx::Error> for APIError {
     fn from(error: sqlx::Error) -> Self {
         APIError::InternalError {
-            message: Some(format!("{}", error)),
+            message: format!("{}", error),
         }
     }
 }
@@ -57,7 +52,7 @@ impl From<sqlx::Error> for APIError {
 impl From<BcryptError> for APIError {
     fn from(error: BcryptError) -> Self {
         APIError::InternalError {
-            message: Some(format!("{}", error)),
+            message: format!("{}", error),
         }
     }
 }

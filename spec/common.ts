@@ -1,6 +1,6 @@
 export type NamedEntity = {
-    firstName: string
-    lastName?: string
+    first_name: string
+    last_name?: string
 }
 
 export type Payload<T> = { payload: T }

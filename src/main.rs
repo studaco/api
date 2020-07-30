@@ -32,9 +32,8 @@ async fn main() -> Result<()> {
     let mut server = HttpServer::new(move || {
         App::new()
             .data(pool.clone())
-            .service(test::test)
-            .service(test::register)
             .service(auth::login)
+            .service(auth::register)
     });
 
     server = match listenfd.take_tcp_listener(0)? {
