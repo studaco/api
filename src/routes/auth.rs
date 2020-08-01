@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
 
 use crate::error::APIError;
-use crate::model::account::{get_account_by_login, register_account};
+use crate::model::account::Account;
 use crate::payload::Payload;
 use crate::token::generate_token;
 
@@ -24,7 +24,7 @@ pub async fn login(
     login_data: web::Json<LoginData>,
 ) -> Result<Payload<AccessTokenResponse>, APIError> {
     let LoginData { login, password } = login_data.into_inner();
-    let account = get_account_by_login(db.get_ref(), login).await?;
+    let account = Account::get_by_login(db.get_ref(), login).await?;
 
     let account = match account {
         Some(account) => account,
@@ -63,7 +63,7 @@ pub async fn register(
         last_name,
     } = registration_data.into_inner();
 
-    let account = register_account(
+    let account = Account::register(
         db.get_ref(),
         first_name,
         last_name,

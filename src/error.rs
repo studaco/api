@@ -16,15 +16,23 @@ pub enum APIError {
     UserDoesNotExist,
     #[error("Invalid credentials")]
     InvalidCredentials,
+    #[error("Login already present")]
+    LoginAlreadyPresent,
     #[error("Invalid token")]
     InvalidToken,
-    #[error("Login already present")]
-    LoginAlreadyPresent
+    #[error("Token expired")]
+    TokenExpired,
+    #[error("No token present")]
+    NoTokenPresent,
+    #[error("Token revoked")]
+    TokenRevoked,
+    #[error("Bad request")]
+    BadRequest { message: Option<String> }
 }
 
 #[derive(Serialize)]
 struct ErrorWrapper {
-    error: APIError
+    error: APIError,
 }
 
 impl ResponseError for APIError {
@@ -32,12 +40,20 @@ impl ResponseError for APIError {
         match self {
             APIError::InternalError { message: _ } => StatusCode::INTERNAL_SERVER_ERROR,
             APIError::UserDoesNotExist => StatusCode::NOT_FOUND,
-            APIError::InvalidCredentials | APIError::InvalidToken | APIError::LoginAlreadyPresent => StatusCode::UNAUTHORIZED,
+            APIError::InvalidCredentials
+            | APIError::InvalidToken
+            | APIError::TokenExpired
+            | APIError::TokenRevoked
+            | APIError::NoTokenPresent
+            | APIError::LoginAlreadyPresent => StatusCode::UNAUTHORIZED,
+            APIError::BadRequest { message: _ }=> StatusCode::BAD_REQUEST
         }
     }
 
     fn error_response(&self) -> HttpResponse {
-        ResponseBuilder::new(self.status_code()).json(ErrorWrapper { error: self.clone() })
+        ResponseBuilder::new(self.status_code()).json(ErrorWrapper {
+            error: self.clone(),
+        })
     }
 }
 
@@ -60,5 +76,26 @@ impl From<BcryptError> for APIError {
 impl From<jwt::Error> for APIError {
     fn from(_: jwt::Error) -> Self {
         APIError::InvalidToken
+    }
+}
+
+trait IntoAPI {
+    fn internal_error(self) -> APIError;
+}
+
+impl<T: std::error::Error> IntoAPI for T {
+    fn internal_error(self) -> APIError {
+        APIError::InternalError {
+            message: format!("{}", self),
+        }
+    }
+}
+trait IntoAPIResult<T> {
+    fn internal_error(self) -> Result<T, APIError>;
+}
+
+impl<T, E: std::error::Error> IntoAPIResult<T> for Result<T, E> {
+    fn internal_error(self) -> Result<T, APIError> {
+        self.map_err(|err| err.internal_error())
     }
 }
