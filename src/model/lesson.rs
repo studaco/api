@@ -10,6 +10,7 @@ use std::vec::Vec;
 use thiserror::Error;
 use uuid::Uuid;
 
+use crate::error::APIError;
 use crate::model::permission::{LessonPermission, PermissionType};
 
 #[derive(Serialize_repr, Deserialize_repr, Copy, Clone, sqlx::Type)]
@@ -120,7 +121,7 @@ struct LessonBase {
 }
 
 impl Repeat {
-    async fn for_lesson(db: &PgPool, lesson_id: &Uuid) -> sqlx::Result<Vec<Repeat>> {
+    pub async fn for_lesson(db: &PgPool, lesson_id: &Uuid) -> sqlx::Result<Vec<Repeat>> {
         Ok(sqlx::query_as(
             "SELECT every, week_day, scheduled_time FROM Repeats WHERE lesson_id = $1 ",
         )
@@ -171,40 +172,64 @@ impl Repeat {
     }
 }
 
+#[derive(Debug, Error)]
+pub enum LessonFetchError {
+    #[error("Lesson not found")]
+    LessonNotFound,
+    #[error("Read permissions abscent")]
+    ReadDenied,
+    #[error("Sqlx error while fetching the user: {0}")]
+    SqlxError(#[from] sqlx::Error),
+}
+
+impl From<LessonFetchError> for APIError {
+    fn from(err: LessonFetchError) -> Self {
+        match err {
+            LessonFetchError::LessonNotFound => APIError::LessonDosNotExist,
+            LessonFetchError::ReadDenied => APIError::NoReadAccess,
+            LessonFetchError::SqlxError(err) => err.into(),
+        }
+    }
+}
+
 impl Lesson {
-    async fn of_user(db: &PgPool, user_id: &Uuid, lesson_id: Uuid) -> sqlx::Result<Option<Lesson>> {
+    pub async fn of_user(
+        db: &PgPool,
+        account_id: &Uuid,
+        lesson_id: Uuid,
+    ) -> Result<Lesson, LessonFetchError> {
         let mut transaction = db.begin().await?;
-        let base: Option<LessonBase> =
+
+        let LessonBase { title, description } =
             sqlx::query_as("SELECT title, description FROM Lesson WHERE id = $1")
                 .bind(&lesson_id)
                 .fetch_optional(&mut transaction)
-                .await?;
+                .await?
+                .ok_or(LessonFetchError::LessonNotFound)?;
 
-        // Couldn't haved used .map as I need to return an error from inner transformation
-        let res = match base {
-            Some(LessonBase { title, description }) => {
-                let repeats: Vec<Repeat> = sqlx::query_as(
-                    "SELECT every, week_day, scheduled_time FROM Repeats WHERE lesson_id = $1 ",
-                )
-                .bind(lesson_id)
-                .fetch_all(&mut transaction)
-                .await?;
+        LessonPermission::get_for_entity_in_transaction(&mut transaction, account_id, lesson_id)
+        .await?
+        .ok_or(LessonFetchError::ReadDenied)?;
 
-                Some(Lesson {
-                    id: lesson_id,
-                    title,
-                    description,
-                    repeats,
-                })
-            }
-            None => None,
+        let repeats: Vec<Repeat> = sqlx::query_as(
+            "SELECT every, week_day, scheduled_time FROM Repeats WHERE lesson_id = $1 ",
+        )
+        .bind(lesson_id)
+        .fetch_all(&mut transaction)
+        .await?;
+
+        let res = Lesson {
+            id: lesson_id,
+            title,
+            description,
+            repeats,
         };
 
         transaction.commit().await?;
         Ok(res)
     }
 
-    async fn create(
+    pub async fn create(
         db: &PgPool,
         title: String,
         description: Option<String>,
@@ -222,7 +247,13 @@ impl Lesson {
 
         Repeat::insert_in_transaction(&mut transaction, &repeats, &id).await?;
 
-        LessonPermission::save_in_transaction(PermissionType::ReadWrite, &id, owner, &mut transaction).await?;
+        LessonPermission::save_in_transaction(
+            PermissionType::ReadWrite,
+            &id,
+            owner,
+            &mut transaction,
+        )
+        .await?;
 
         transaction.commit().await?;
 

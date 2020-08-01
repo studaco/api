@@ -12,12 +12,13 @@ use thiserror::Error;
 pub enum APIError {
     #[error("Internal server error ({message})")]
     InternalError { message: String },
-    #[error("User does not exist")]
-    UserDoesNotExist,
-    #[error("Invalid credentials")]
-    InvalidCredentials,
+
     #[error("Login already present")]
     LoginAlreadyPresent,
+
+    #[error("Invalid credentials")]
+    InvalidCredentials,
+
     #[error("Invalid token")]
     InvalidToken,
     #[error("Token expired")]
@@ -26,8 +27,19 @@ pub enum APIError {
     NoTokenPresent,
     #[error("Token revoked")]
     TokenRevoked,
+
     #[error("Bad request")]
-    BadRequest { message: Option<String> }
+    BadRequest { message: Option<String> },
+
+    #[error("Lesson does not exist")]
+    LessonDosNotExist,
+    #[error("User does not exist")]
+    UserDoesNotExist,
+
+    #[error("No read access")]
+    NoReadAccess,
+    #[error("No write access")]
+    NoWriteAccess,
 }
 
 #[derive(Serialize)]
@@ -39,14 +51,15 @@ impl ResponseError for APIError {
     fn status_code(&self) -> StatusCode {
         match self {
             APIError::InternalError { message: _ } => StatusCode::INTERNAL_SERVER_ERROR,
-            APIError::UserDoesNotExist => StatusCode::NOT_FOUND,
+            APIError::UserDoesNotExist | APIError::LessonDosNotExist => StatusCode::NOT_FOUND,
             APIError::InvalidCredentials
             | APIError::InvalidToken
             | APIError::TokenExpired
             | APIError::TokenRevoked
             | APIError::NoTokenPresent
             | APIError::LoginAlreadyPresent => StatusCode::UNAUTHORIZED,
-            APIError::BadRequest { message: _ }=> StatusCode::BAD_REQUEST
+            APIError::BadRequest { message: _ } => StatusCode::BAD_REQUEST,
+            APIError::NoReadAccess | APIError::NoWriteAccess => StatusCode::FORBIDDEN,
         }
     }
 

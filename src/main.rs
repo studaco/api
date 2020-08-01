@@ -34,6 +34,7 @@ async fn main() -> Result<()> {
             .data(pool.clone())
             .service(auth::login)
             .service(auth::register)
+            .service(lesson::get_lesson)
     });
 
     server = match listenfd.take_tcp_listener(0)? {

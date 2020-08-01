@@ -81,6 +81,20 @@ impl LessonPermission {
         .await?)
     }
 
+    pub(crate) async fn get_for_entity_in_transaction(
+        transaction: &mut Transaction<PoolConnection<PgConnection>>,
+        account_id: &Uuid,
+        lesson_id: Uuid,
+    ) -> sqlx::Result<Option<LessonPermission>> {
+        Ok(sqlx::query_as(
+            "SELECT type FROM LessonPermission WHERE lesson_id = $1 AND account_id = $2",
+        )
+        .bind(&lesson_id)
+        .bind(&account_id)
+        .fetch_optional(transaction)
+        .await?)
+    }
+
     pub(crate) async fn save_in_transaction(
         permission_type: PermissionType,
         lesson_id: &Uuid,
