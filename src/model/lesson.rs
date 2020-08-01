@@ -2,12 +2,15 @@ use chrono::{NaiveTime, Timelike};
 use serde::Serialize;
 use serde_repr::{Deserialize_repr, Serialize_repr};
 use sqlx::{
-    postgres::{PgPool, PgQueryAs, PgRow},
-    Row,
+    pool::PoolConnection,
+    postgres::{PgConnection, PgPool, PgQueryAs, PgRow},
+    Row, Transaction,
 };
 use std::vec::Vec;
 use thiserror::Error;
 use uuid::Uuid;
+
+use crate::model::permission::{LessonPermission, PermissionType};
 
 #[derive(Serialize_repr, Deserialize_repr, Copy, Clone, sqlx::Type)]
 #[repr(i64)]
@@ -16,7 +19,7 @@ pub enum RepetitionFrequency {
     BiWeekly = 2,
 }
 
-#[derive(sqlx::Type)]
+#[derive(Copy, Clone, sqlx::Type)]
 #[sqlx(rename = "weekday")]
 enum PgWeekDay {
     MON,
@@ -42,7 +45,7 @@ impl From<WeekDay> for PgWeekDay {
     }
 }
 
-#[derive(Serialize_repr, Deserialize_repr)]
+#[derive(Copy, Clone, Serialize_repr, Deserialize_repr)]
 #[repr(u8)]
 pub enum WeekDay {
     Monday = 1,
@@ -106,7 +109,14 @@ impl<'c> sqlx::FromRow<'c, PgRow<'c>> for Repeat {
 pub struct Lesson {
     id: Uuid,
     title: String,
+    description: Option<String>,
     repeats: Vec<Repeat>,
+}
+
+#[derive(sqlx::FromRow)]
+struct LessonBase {
+    title: String,
+    description: Option<String>,
 }
 
 impl Repeat {
@@ -117,5 +127,110 @@ impl Repeat {
         .bind(lesson_id)
         .fetch_all(db)
         .await?)
+    }
+
+    async fn insert_in_transaction(
+        transaction: &mut Transaction<PoolConnection<PgConnection>>,
+        repeats: &Vec<Repeat>,
+        lesson_id: &Uuid,
+    ) -> sqlx::Result<()> {
+        let values = (0..repeats.len())
+            .map(|i| {
+                format!(
+                    "(${}, ${}, ${}, ${})",
+                    i * 4,
+                    i * 4 + 1,
+                    i * 4 + 2,
+                    i * 4 + 3
+                )
+                .to_string()
+            })
+            .collect::<Vec<String>>()
+            .join(",");
+
+        let sql = format!(
+            "INSERT INTO Repeats (every, week_day, scheduled_time, lesson_id) VALUES {}",
+            values
+        );
+
+        let mut query = sqlx::query(&sql[..]);
+
+        for Repeat {
+            every,
+            day,
+            time: Time { hour, minute },
+        } in repeats
+        {
+            let time = NaiveTime::from_hms(hour.clone() as u32, minute.clone() as u32, 0);
+            let week_day: PgWeekDay = day.clone().into();
+            query = query.bind(every).bind(week_day).bind(time).bind(lesson_id);
+        }
+        query.execute(transaction).await?;
+
+        Ok(())
+    }
+}
+
+impl Lesson {
+    async fn of_user(db: &PgPool, user_id: &Uuid, lesson_id: Uuid) -> sqlx::Result<Option<Lesson>> {
+        let mut transaction = db.begin().await?;
+        let base: Option<LessonBase> =
+            sqlx::query_as("SELECT title, description FROM Lesson WHERE id = $1")
+                .bind(&lesson_id)
+                .fetch_optional(&mut transaction)
+                .await?;
+
+        // Couldn't haved used .map as I need to return an error from inner transformation
+        let res = match base {
+            Some(LessonBase { title, description }) => {
+                let repeats: Vec<Repeat> = sqlx::query_as(
+                    "SELECT every, week_day, scheduled_time FROM Repeats WHERE lesson_id = $1 ",
+                )
+                .bind(lesson_id)
+                .fetch_all(&mut transaction)
+                .await?;
+
+                Some(Lesson {
+                    id: lesson_id,
+                    title,
+                    description,
+                    repeats,
+                })
+            }
+            None => None,
+        };
+
+        transaction.commit().await?;
+        Ok(res)
+    }
+
+    async fn create(
+        db: &PgPool,
+        title: String,
+        description: Option<String>,
+        repeats: Vec<Repeat>,
+        owner: &Uuid,
+    ) -> sqlx::Result<Lesson> {
+        let mut transaction = db.begin().await?;
+
+        let (id,): (Uuid,) =
+            sqlx::query_as("INSERT INTO Lesson (title, description) VALUES ($1, $2) RETURNING id")
+                .bind(&title)
+                .bind(&description)
+                .fetch_one(&mut transaction)
+                .await?;
+
+        Repeat::insert_in_transaction(&mut transaction, &repeats, &id).await?;
+
+        LessonPermission::save_in_transaction(PermissionType::ReadWrite, &id, owner, &mut transaction).await?;
+
+        transaction.commit().await?;
+
+        Ok(Lesson {
+            id,
+            description,
+            title,
+            repeats,
+        })
     }
 }
