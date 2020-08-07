@@ -1,11 +1,12 @@
 use serde::{Deserialize, Serialize};
 use sqlx::{
-    pool::PoolConnection,
-    postgres::{PgConnection, PgPool, PgQueryAs, PgRow},
-    Row, Transaction,
+    postgres::{PgPool, PgQueryAs, PgRow},
+    Row,
 };
 use thiserror::Error;
 use uuid::Uuid;
+
+use crate::model::Transaction;
 
 #[derive(sqlx::Type)]
 #[sqlx(rename = "permissiontype", rename_all = "lowercase")]
@@ -67,39 +68,43 @@ impl<'c> sqlx::FromRow<'c, PgRow<'c>> for LessonPermission {
 }
 
 impl LessonPermission {
-    pub async fn get_for_entity(
+    pub async fn of_entity(
         db: &PgPool,
         account_id: Uuid,
         lesson_id: Uuid,
     ) -> sqlx::Result<Option<LessonPermission>> {
-        Ok(sqlx::query_as(
+        Ok(
+            LessonPermission::type_of_entity(db, &account_id, &lesson_id)
+                .await?
+                .map(|permission_type| LessonPermission {
+                    permission_type,
+                    account_id,
+                    lesson_id,
+                }),
+        )
+    }
+
+    pub async fn type_of_entity(
+        db: &PgPool,
+        account_id: &Uuid,
+        lesson_id: &Uuid,
+    ) -> sqlx::Result<Option<PermissionType>> {
+        let res: Option<(PgPermissionType,)> = sqlx::query_as(
             "SELECT type FROM LessonPermission WHERE lesson_id = $1 AND account_id = $2",
         )
         .bind(&lesson_id)
         .bind(&account_id)
         .fetch_optional(db)
-        .await?)
-    }
+        .await?;
 
-    pub(crate) async fn get_for_entity_in_transaction(
-        transaction: &mut Transaction<PoolConnection<PgConnection>>,
-        account_id: &Uuid,
-        lesson_id: Uuid,
-    ) -> sqlx::Result<Option<LessonPermission>> {
-        Ok(sqlx::query_as(
-            "SELECT type FROM LessonPermission WHERE lesson_id = $1 AND account_id = $2",
-        )
-        .bind(&lesson_id)
-        .bind(&account_id)
-        .fetch_optional(transaction)
-        .await?)
+        Ok(res.map(|(permission_type,)| permission_type.into()))
     }
 
     pub(crate) async fn save_in_transaction(
+        transaction: &mut Transaction,
         permission_type: PermissionType,
         lesson_id: &Uuid,
         account_id: &Uuid,
-        transaction: &mut Transaction<PoolConnection<PgConnection>>,
     ) -> sqlx::Result<()> {
         let permission_type: PgPermissionType = permission_type.into();
         sqlx::query(

@@ -6,6 +6,8 @@ use serde::Serialize;
 use sqlx;
 use thiserror::Error;
 
+use crate::payload::Payload;
+
 #[derive(Error, Serialize, Debug, Clone)]
 #[serde(tag = "type")]
 #[serde(rename_all = "snake_case")]
@@ -104,11 +106,13 @@ impl<T: std::error::Error> IntoAPI for T {
     }
 }
 trait IntoAPIResult<T> {
-    fn internal_error(self) -> Result<T, APIError>;
+    fn internal_error(self) -> std::result::Result<T, APIError>;
 }
 
-impl<T, E: std::error::Error> IntoAPIResult<T> for Result<T, E> {
-    fn internal_error(self) -> Result<T, APIError> {
+impl<T, E: std::error::Error> IntoAPIResult<T> for std::result::Result<T, E> {
+    fn internal_error(self) -> std::result::Result<T, APIError> {
         self.map_err(|err| err.internal_error())
     }
 }
+
+pub type Result<T> = std::result::Result<Payload<T>, APIError>;

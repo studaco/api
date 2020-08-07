@@ -191,14 +191,8 @@ paths:
               $ref: 'examples.json#/addLesson'
       
       responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema: 
-                $ref: 'responses.json#/definitions/NewLesson'
-              example:
-                $ref: 'examples.json#/getLesson'
+        '204':
+          description: Updated (No content)
         '401':
           $ref: '#/components/responses/unauthorized'
         '403':
@@ -246,7 +240,7 @@ paths:
 
       responses:
         '204':
-          description: OK (No content)
+          description: Deleted (No content)
         '401':
           $ref: '#/components/responses/unauthorized'
         '403':

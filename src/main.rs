@@ -1,3 +1,4 @@
+#![feature(try_trait)]
 use actix_web::{App, HttpServer};
 use anyhow::Result;
 use dotenv::dotenv;
@@ -8,10 +9,11 @@ use sqlx_pg_migrate::migrate;
 use std::env;
 
 mod error;
-pub mod model;
+mod model;
 mod payload;
 mod routes;
 mod token;
+mod response;
 use routes::*;
 
 static MIGRATIONS: Dir = include_dir!("sql");

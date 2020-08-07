@@ -15,7 +15,8 @@ actix-rt = "1"
 actix-http = "1.0"
 actix-service = "1.0"
 chrono = "0.4"
-sqlx = { version = "0.3", features = [ "postgres", "uuid", "chrono" ] }
+sqlx-core = "0.3.5"
+sqlx = { version = "0.3.5", features = [ "postgres", "uuid", "chrono" ] }
 anyhow = "1.0"
 listenfd = "0.3"
 sqlx-pg-migrate = "1.0"

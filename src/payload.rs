@@ -4,7 +4,7 @@ use futures::future::{ok, Ready};
 use serde::Serialize;
 
 #[derive(Serialize)]
-pub struct Payload<T>
+pub struct Payload<T: Serialize>
 where
     T: Serialize,
 {

@@ -2,9 +2,8 @@ use actix_web::{post, web};
 use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
 
-use crate::error::APIError;
+use crate::error::{APIError, Result};
 use crate::model::account::Account;
-use crate::payload::Payload;
 use crate::token::generate_token;
 
 #[derive(Deserialize)]
@@ -22,7 +21,7 @@ pub struct AccessTokenResponse {
 pub async fn login(
     db: web::Data<PgPool>,
     login_data: web::Json<LoginData>,
-) -> Result<Payload<AccessTokenResponse>, APIError> {
+) -> Result<AccessTokenResponse> {
     let LoginData { login, password } = login_data.into_inner();
     let account = Account::get_by_login(db.get_ref(), login).await?;
 
@@ -55,7 +54,7 @@ pub struct RegistrationData {
 pub async fn register(
     db: web::Data<PgPool>,
     registration_data: web::Json<RegistrationData>,
-) -> Result<Payload<AccessTokenResponse>, APIError> {
+) -> Result<AccessTokenResponse> {
     let RegistrationData {
         login: registration_login,
         password,

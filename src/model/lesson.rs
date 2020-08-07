@@ -1,17 +1,16 @@
 use chrono::{NaiveTime, Timelike};
-use serde::Serialize;
+use serde::{Serialize, Deserialize};
 use serde_repr::{Deserialize_repr, Serialize_repr};
 use sqlx::{
-    pool::PoolConnection,
-    postgres::{PgConnection, PgPool, PgQueryAs, PgRow},
-    Row, Transaction,
+    postgres::{PgPool, PgQueryAs, PgRow},
+    Row,
 };
 use std::vec::Vec;
 use thiserror::Error;
 use uuid::Uuid;
 
-use crate::error::APIError;
 use crate::model::permission::{LessonPermission, PermissionType};
+use crate::model::Transaction;
 
 #[derive(Serialize_repr, Deserialize_repr, Copy, Clone, sqlx::Type)]
 #[repr(i64)]
@@ -72,13 +71,13 @@ impl From<PgWeekDay> for WeekDay {
     }
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize)]
 pub struct Time {
     minute: u8,
     hour: u8,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize)]
 pub struct Repeat {
     every: RepetitionFrequency,
     day: WeekDay,
@@ -108,10 +107,10 @@ impl<'c> sqlx::FromRow<'c, PgRow<'c>> for Repeat {
 
 #[derive(Serialize)]
 pub struct Lesson {
-    id: Uuid,
-    title: String,
-    description: Option<String>,
-    repeats: Vec<Repeat>,
+    pub id: Uuid,
+    pub title: String,
+    pub description: Option<String>,
+    pub repeats: Vec<Repeat>,
 }
 
 #[derive(sqlx::FromRow)]
@@ -131,102 +130,79 @@ impl Repeat {
     }
 
     async fn insert_in_transaction(
-        transaction: &mut Transaction<PoolConnection<PgConnection>>,
+        transaction: &mut Transaction,
         repeats: &Vec<Repeat>,
         lesson_id: &Uuid,
     ) -> sqlx::Result<()> {
-        let values = (0..repeats.len())
-            .map(|i| {
-                format!(
-                    "(${}, ${}, ${}, ${})",
-                    i * 4,
-                    i * 4 + 1,
-                    i * 4 + 2,
-                    i * 4 + 3
-                )
-                .to_string()
-            })
-            .collect::<Vec<String>>()
-            .join(",");
+        if !repeats.is_empty() {
+            let values = (0..repeats.len())
+                .map(|i| {
+                    format!(
+                        "(${}, ${}, ${}, ${})",
+                        i * 4,
+                        i * 4 + 1,
+                        i * 4 + 2,
+                        i * 4 + 3
+                    )
+                    .to_string()
+                })
+                .collect::<Vec<String>>()
+                .join(",");
 
-        let sql = format!(
-            "INSERT INTO Repeats (every, week_day, scheduled_time, lesson_id) VALUES {}",
-            values
-        );
+            let sql = format!(
+                "INSERT INTO Repeats (every, week_day, scheduled_time, lesson_id) VALUES {}",
+                values
+            );
 
-        let mut query = sqlx::query(&sql[..]);
+            let mut query = sqlx::query(&sql[..]);
 
-        for Repeat {
-            every,
-            day,
-            time: Time { hour, minute },
-        } in repeats
-        {
-            let time = NaiveTime::from_hms(hour.clone() as u32, minute.clone() as u32, 0);
-            let week_day: PgWeekDay = day.clone().into();
-            query = query.bind(every).bind(week_day).bind(time).bind(lesson_id);
+            for Repeat {
+                every,
+                day,
+                time: Time { hour, minute },
+            } in repeats
+            {
+                let time = NaiveTime::from_hms(hour.clone() as u32, minute.clone() as u32, 0);
+                let week_day: PgWeekDay = day.clone().into();
+                query = query.bind(every).bind(week_day).bind(time).bind(lesson_id);
+            }
+            query.execute(transaction).await?;
         }
-        query.execute(transaction).await?;
 
         Ok(())
     }
 }
 
-#[derive(Debug, Error)]
-pub enum LessonFetchError {
-    #[error("Lesson not found")]
-    LessonNotFound,
-    #[error("Read permissions abscent")]
-    ReadDenied,
-    #[error("Sqlx error while fetching the user: {0}")]
-    SqlxError(#[from] sqlx::Error),
-}
-
-impl From<LessonFetchError> for APIError {
-    fn from(err: LessonFetchError) -> Self {
-        match err {
-            LessonFetchError::LessonNotFound => APIError::LessonDosNotExist,
-            LessonFetchError::ReadDenied => APIError::NoReadAccess,
-            LessonFetchError::SqlxError(err) => err.into(),
-        }
-    }
-}
-
 impl Lesson {
-    pub async fn of_user(
-        db: &PgPool,
-        account_id: &Uuid,
-        lesson_id: Uuid,
-    ) -> Result<Lesson, LessonFetchError> {
+    pub async fn of_user(db: &PgPool, lesson_id: Uuid) -> sqlx::Result<Option<Lesson>> {
         let mut transaction = db.begin().await?;
 
-        let LessonBase { title, description } =
-            sqlx::query_as("SELECT title, description FROM Lesson WHERE id = $1")
-                .bind(&lesson_id)
-                .fetch_optional(&mut transaction)
-                .await?
-                .ok_or(LessonFetchError::LessonNotFound)?;
+        let base = sqlx::query_as("SELECT title, description FROM Lesson WHERE id = $1")
+            .bind(&lesson_id)
+            .fetch_optional(&mut transaction)
+            .await?;
 
-        LessonPermission::get_for_entity_in_transaction(&mut transaction, account_id, lesson_id)
-        .await?
-        .ok_or(LessonFetchError::ReadDenied)?;
+        Ok(match base {
+            None => None,
+            Some(LessonBase { description, title }) => {
+                let repeats: Vec<Repeat> = sqlx::query_as(
+                    "SELECT every, week_day, scheduled_time FROM Repeats WHERE lesson_id = $1 ",
+                )
+                .bind(lesson_id)
+                .fetch_all(&mut transaction)
+                .await?;
 
-        let repeats: Vec<Repeat> = sqlx::query_as(
-            "SELECT every, week_day, scheduled_time FROM Repeats WHERE lesson_id = $1 ",
-        )
-        .bind(lesson_id)
-        .fetch_all(&mut transaction)
-        .await?;
+                let res = Lesson {
+                    id: lesson_id,
+                    title,
+                    description,
+                    repeats,
+                };
 
-        let res = Lesson {
-            id: lesson_id,
-            title,
-            description,
-            repeats,
-        };
-
-        transaction.commit().await?;
-        Ok(res)
+                transaction.commit().await?;
+                Some(res)
+            }
+        })
     }
 
     pub async fn create(
@@ -234,7 +210,7 @@ impl Lesson {
         title: String,
         description: Option<String>,
         repeats: Vec<Repeat>,
-        owner: &Uuid,
+        owner: &Uuid
     ) -> sqlx::Result<Lesson> {
         let mut transaction = db.begin().await?;
 
@@ -247,15 +223,7 @@ impl Lesson {
 
         Repeat::insert_in_transaction(&mut transaction, &repeats, &id).await?;
 
-        LessonPermission::save_in_transaction(
-            PermissionType::ReadWrite,
-            &id,
-            owner,
-            &mut transaction,
-        )
-        .await?;
-
-        transaction.commit().await?;
+        LessonPermission::save_in_transaction(&mut transaction, PermissionType::ReadWrite, &id, &owner).await?;
 
         Ok(Lesson {
             id,
@@ -264,4 +232,7 @@ impl Lesson {
             repeats,
         })
     }
+
+    // pub async fn update();
+    // pub async fn delete();
 }
