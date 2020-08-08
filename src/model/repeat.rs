@@ -2,7 +2,7 @@ use chrono::{NaiveTime, Timelike};
 use serde::{Deserialize, Serialize};
 use serde_repr::{Deserialize_repr, Serialize_repr};
 use sqlx::{
-    postgres::{PgPool, PgQueryAs, PgRow},
+    postgres::{PgQueryAs, PgRow},
     Row,
 };
 use std::vec::Vec;

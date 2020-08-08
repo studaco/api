@@ -5,6 +5,7 @@ use uuid::Uuid;
 
 use super::permission::{LessonPermission, PermissionType};
 use super::repeat::Repeat;
+use super::account::AccountID;
 
 #[derive(Serialize)]
 pub struct Lesson {
@@ -52,7 +53,7 @@ impl Lesson {
         title: String,
         description: Option<String>,
         repeats: Vec<Repeat>,
-        owner: &Uuid,
+        owner: &AccountID,
     ) -> sqlx::Result<Lesson> {
         let mut transaction = db.begin().await?;
 

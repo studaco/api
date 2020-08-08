@@ -5,9 +5,9 @@ use actix_service::{Service, Transform};
 use actix_web::{dev::ServiceRequest, dev::ServiceResponse, Error};
 use futures::future::{err, ok, Ready};
 use futures::Future;
-use log;
 
-use crate::token::authenticate_claim_from_headers;
+use crate::token::{authenticate_claim_from_headers, Claim};
+use crate::model::account::AccountID;
 
 pub struct Authentication;
 
@@ -50,11 +50,10 @@ where
 
     fn call(&mut self, req: ServiceRequest) -> Self::Future {
         let claim = authenticate_claim_from_headers(req.headers());
-        log::info!("Extracted claim: {:?}", claim);
         match claim {
-            Ok(claim) => {
+            Ok(Claim { id }) => {
                 let (http_req, payload) = req.into_parts();
-                http_req.extensions_mut().insert(claim);
+                http_req.extensions_mut().insert(AccountID(id));
                 let new_req =
                     ServiceRequest::from_parts(http_req, payload).unwrap_or_else(|_| panic!("???"));
                 Box::pin(self.service.call(new_req))

@@ -7,6 +7,7 @@ use thiserror::Error;
 use uuid::Uuid;
 
 use super::Transaction;
+use super::account::AccountID;
 
 #[derive(Debug, sqlx::Type)]
 #[sqlx(rename = "permissiontype", rename_all = "lowercase")]
@@ -70,7 +71,7 @@ impl<'c> sqlx::FromRow<'c, PgRow<'c>> for LessonPermission {
 impl LessonPermission {
     pub async fn type_of_entity(
         db: &PgPool,
-        account_id: &Uuid,
+        account_id: &AccountID,
         lesson_id: &Uuid,
     ) -> sqlx::Result<Option<PermissionType>> {
         let res: Option<(PgPermissionType,)> = sqlx::query_as(
@@ -88,7 +89,7 @@ impl LessonPermission {
         transaction: &mut Transaction,
         permission_type: PermissionType,
         lesson_id: &Uuid,
-        account_id: &Uuid,
+        account_id: &AccountID,
     ) -> sqlx::Result<()> {
         let permission_type: PgPermissionType = permission_type.into();
         sqlx::query(

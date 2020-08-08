@@ -5,18 +5,20 @@ use std::vec::Vec;
 use uuid::Uuid;
 
 use crate::error::{APIError, Result};
-use crate::model::lesson::Lesson;
-use crate::model::permission::{LessonPermission, PermissionType};
-use crate::model::repeat::Repeat;
-use crate::token::Claim;
-use crate::util::deserialize_optional_field;
 use crate::middleware::Authentication;
+use crate::model::{
+    lesson::Lesson,
+    permission::{LessonPermission, PermissionType},
+    repeat::Repeat,
+    account::AccountID
+};
+use crate::util::deserialize_optional_field;
 
-#[get("/lesson/{id}", wrap="Authentication")]
+#[get("/lesson/{id}", wrap = "Authentication")]
 pub async fn get_lesson(
     db: web::Data<PgPool>,
     lesson_id: web::Path<Uuid>,
-    Claim { id: account_id }: Claim
+    account_id: AccountID,
 ) -> Result<Lesson> {
     let lesson_id = lesson_id.into_inner();
     let lesson = Lesson::of_user(db.get_ref(), lesson_id)
@@ -37,11 +39,11 @@ pub struct LessonCreateRequest {
     repeats: Vec<Repeat>,
 }
 
-#[put("/lesson", wrap="Authentication")]
+#[put("/lesson", wrap = "Authentication")]
 pub async fn put_lesson(
     db: web::Data<PgPool>,
     lesson: web::Json<LessonCreateRequest>,
-    Claim { id: account_id }: Claim,
+    account_id: AccountID,
 ) -> Result<Lesson> {
     let LessonCreateRequest {
         title,
@@ -67,12 +69,12 @@ pub struct LessonUpdateRequest {
     repeats: Option<Vec<Repeat>>,
 }
 
-#[patch("/lesson/{id}", wrap="Authentication")]
+#[patch("/lesson/{id}", wrap = "Authentication")]
 pub async fn patch_lesson(
     db: web::Data<PgPool>,
     id: web::Path<Uuid>,
     patch: web::Json<LessonUpdateRequest>,
-    Claim { id: account_id }: Claim
+    account_id: AccountID,
 ) -> std::result::Result<HttpResponse, APIError> {
     let lesson_id = id.into_inner();
     if let Some(PermissionType::ReadWrite) =
@@ -90,11 +92,11 @@ pub async fn patch_lesson(
     }
 }
 
-#[delete("/lesson/{id}", wrap="Authentication")]
+#[delete("/lesson/{id}", wrap = "Authentication")]
 pub async fn delete_lesson(
     db: web::Data<PgPool>,
     id: web::Path<Uuid>,
-    Claim { id: account_id }: Claim
+    account_id: AccountID,
 ) -> std::result::Result<HttpResponse, APIError> {
     let lesson_id = id.into_inner();
 
