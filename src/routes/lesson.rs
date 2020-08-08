@@ -1,4 +1,5 @@
 use actix_web::{delete, get, patch, put, web, HttpRequest, HttpResponse};
+use chrono::Date;
 use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
 use std::vec::Vec;
@@ -21,7 +22,9 @@ pub async fn get_lesson(
 
     let lesson_id = lesson_id.into_inner();
 
-    let lesson = Lesson::of_user(db.get_ref(), lesson_id).await?.ok_or(APIError::LessonDosNotExist)?;
+    let lesson = Lesson::of_user(db.get_ref(), lesson_id)
+        .await?
+        .ok_or(APIError::LessonDosNotExist)?;
 
     LessonPermission::type_of_entity(db.get_ref(), &account_id, &lesson_id)
         .await?
@@ -111,4 +114,11 @@ pub async fn delete_lesson(
     } else {
         Err(APIError::NoWriteAccess)
     }
+}
+
+pub fn configure_lesson_routes(cfg: &mut web::ServiceConfig) {
+    cfg.service(get_lesson)
+        .service(put_lesson)
+        .service(patch_lesson)
+        .service(delete_lesson);
 }

@@ -76,3 +76,7 @@ pub async fn register(
     }
     .into())
 }
+
+pub fn configure_auth_routes(cfg: &mut web::ServiceConfig) {
+    cfg.service(login).service(register);
+}
