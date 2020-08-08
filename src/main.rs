@@ -1,5 +1,5 @@
 #![feature(try_trait)]
-use actix_web::{App, HttpServer};
+use actix_web::{App, HttpServer, middleware::{Compress, Logger, NormalizePath}};
 use anyhow::Result;
 use dotenv::dotenv;
 use include_dir::{include_dir, Dir};
@@ -15,6 +15,7 @@ mod payload;
 mod routes;
 mod token;
 mod util;
+mod middleware;
 use routes::configure_routes;
 
 static MIGRATIONS: Dir = include_dir!("sql");
@@ -36,6 +37,10 @@ async fn main() -> Result<()> {
     let mut server = HttpServer::new(move || {
         App::new()
             .data(pool.clone())
+            .wrap(Compress::default())
+            .wrap(NormalizePath)
+            .wrap(Logger::default())
+            // TODO: Add CORS support
             .configure(configure_routes)
     });
 

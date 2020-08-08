@@ -1,5 +1,4 @@
-use actix_web::{delete, get, patch, put, web, HttpRequest, HttpResponse};
-use chrono::Date;
+use actix_web::{delete, get, patch, put, web, HttpResponse};
 use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
 use std::vec::Vec;
@@ -9,19 +8,17 @@ use crate::error::{APIError, Result};
 use crate::model::lesson::Lesson;
 use crate::model::permission::{LessonPermission, PermissionType};
 use crate::model::repeat::Repeat;
-use crate::token::authorize_headers;
+use crate::token::Claim;
 use crate::util::deserialize_optional_field;
+use crate::middleware::Authentication;
 
-#[get("/lesson/{id}")]
+#[get("/lesson/{id}", wrap="Authentication")]
 pub async fn get_lesson(
     db: web::Data<PgPool>,
     lesson_id: web::Path<Uuid>,
-    request: HttpRequest,
+    Claim { id: account_id }: Claim
 ) -> Result<Lesson> {
-    let account_id = authorize_headers(request.headers())?;
-
     let lesson_id = lesson_id.into_inner();
-
     let lesson = Lesson::of_user(db.get_ref(), lesson_id)
         .await?
         .ok_or(APIError::LessonDosNotExist)?;
@@ -40,14 +37,12 @@ pub struct LessonCreateRequest {
     repeats: Vec<Repeat>,
 }
 
-#[put("/lesson")]
+#[put("/lesson", wrap="Authentication")]
 pub async fn put_lesson(
     db: web::Data<PgPool>,
     lesson: web::Json<LessonCreateRequest>,
-    request: HttpRequest,
+    Claim { id: account_id }: Claim,
 ) -> Result<Lesson> {
-    let account_id = authorize_headers(request.headers())?;
-
     let LessonCreateRequest {
         title,
         description,
@@ -72,16 +67,14 @@ pub struct LessonUpdateRequest {
     repeats: Option<Vec<Repeat>>,
 }
 
-#[patch("/lesson/{id}")]
+#[patch("/lesson/{id}", wrap="Authentication")]
 pub async fn patch_lesson(
     db: web::Data<PgPool>,
     id: web::Path<Uuid>,
     patch: web::Json<LessonUpdateRequest>,
-    request: HttpRequest,
+    Claim { id: account_id }: Claim
 ) -> std::result::Result<HttpResponse, APIError> {
     let lesson_id = id.into_inner();
-    let account_id = authorize_headers(request.headers())?;
-
     if let Some(PermissionType::ReadWrite) =
         LessonPermission::type_of_entity(db.get_ref(), &account_id, &lesson_id).await?
     {
@@ -97,14 +90,13 @@ pub async fn patch_lesson(
     }
 }
 
-#[delete("/lesson/{id}")]
+#[delete("/lesson/{id}", wrap="Authentication")]
 pub async fn delete_lesson(
     db: web::Data<PgPool>,
     id: web::Path<Uuid>,
-    request: HttpRequest,
+    Claim { id: account_id }: Claim
 ) -> std::result::Result<HttpResponse, APIError> {
     let lesson_id = id.into_inner();
-    let account_id = authorize_headers(request.headers())?;
 
     if let Some(PermissionType::ReadWrite) =
         LessonPermission::type_of_entity(db.get_ref(), &account_id, &lesson_id).await?

@@ -105,15 +105,6 @@ impl<'c> sqlx::FromRow<'c, PgRow<'c>> for Repeat {
 }
 
 impl Repeat {
-    pub async fn of_lesson(db: &PgPool, lesson_id: &Uuid) -> sqlx::Result<Vec<Repeat>> {
-        sqlx::query_as(
-            "SELECT every, week_day, scheduled_time FROM Repeats WHERE lesson_id = $1 ",
-        )
-        .bind(lesson_id)
-        .fetch_all(db)
-        .await
-    }
-
     pub async fn of_lesson_in_transaction(transaction: &mut Transaction, lesson_id: &Uuid) -> sqlx::Result<Vec<Repeat>> {
         sqlx::query_as(
             "SELECT every, week_day, scheduled_time FROM Repeats WHERE lesson_id = $1 ",

@@ -36,17 +36,6 @@ impl From<RegistrationError> for APIError {
 }
 
 impl Account {
-    pub async fn get_by_id(db: &PgPool, id: Uuid) -> sqlx::Result<Option<Account>> {
-        sqlx::query_as!(
-            Account,
-            r#"SELECT id, first_name, last_name, login, password_hash 
-        FROM Account WHERE id = $1"#,
-            id
-        )
-        .fetch_optional(db)
-        .await
-    }
-
     pub async fn get_by_login(db: &PgPool, login: String) -> sqlx::Result<Option<Account>> {
         sqlx::query_as!(
             Account,

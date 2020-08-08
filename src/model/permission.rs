@@ -5,7 +5,6 @@ use sqlx::{
 };
 use thiserror::Error;
 use uuid::Uuid;
-use log;
 
 use super::Transaction;
 
@@ -69,22 +68,6 @@ impl<'c> sqlx::FromRow<'c, PgRow<'c>> for LessonPermission {
 }
 
 impl LessonPermission {
-    pub async fn of_entity(
-        db: &PgPool,
-        account_id: Uuid,
-        lesson_id: Uuid,
-    ) -> sqlx::Result<Option<LessonPermission>> {
-        Ok(
-            LessonPermission::type_of_entity(db, &account_id, &lesson_id)
-                .await?
-                .map(|permission_type| LessonPermission {
-                    permission_type,
-                    account_id,
-                    lesson_id,
-                }),
-        )
-    }
-
     pub async fn type_of_entity(
         db: &PgPool,
         account_id: &Uuid,
