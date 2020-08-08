@@ -7,20 +7,22 @@ use listenfd::ListenFd;
 use sqlx::postgres::PgPool;
 use sqlx_pg_migrate::migrate;
 use std::env;
+use env_logger;
 
 mod error;
 mod model;
 mod payload;
 mod routes;
 mod token;
-mod response;
-use routes::*;
+mod util;
+use routes::configure_routes;
 
 static MIGRATIONS: Dir = include_dir!("sql");
 
 #[actix_rt::main]
 async fn main() -> Result<()> {
     dotenv().ok();
+    env_logger::init();
 
     let mut listenfd = ListenFd::from_env();
 
@@ -34,9 +36,7 @@ async fn main() -> Result<()> {
     let mut server = HttpServer::new(move || {
         App::new()
             .data(pool.clone())
-            .service(auth::login)
-            .service(auth::register)
-            .service(lesson::get_lesson)
+            .configure(configure_routes)
     });
 
     server = match listenfd.take_tcp_listener(0)? {

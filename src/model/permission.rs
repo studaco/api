@@ -5,10 +5,11 @@ use sqlx::{
 };
 use thiserror::Error;
 use uuid::Uuid;
+use log;
 
-use crate::model::Transaction;
+use super::Transaction;
 
-#[derive(sqlx::Type)]
+#[derive(Debug, sqlx::Type)]
 #[sqlx(rename = "permissiontype", rename_all = "lowercase")]
 enum PgPermissionType {
     R,
@@ -24,7 +25,7 @@ impl From<PermissionType> for PgPermissionType {
     }
 }
 
-#[derive(Deserialize, Serialize, Copy, Clone)]
+#[derive(Debug, Deserialize, Serialize, Copy, Clone)]
 pub enum PermissionType {
     #[serde(rename = "r")]
     Read,
@@ -41,7 +42,7 @@ impl From<PgPermissionType> for PermissionType {
     }
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct LessonPermission {
     permission_type: PermissionType,
     lesson_id: Uuid,

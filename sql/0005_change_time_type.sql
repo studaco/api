@@ -1,0 +1,1 @@
+ALTER TABLE repeats ALTER COLUMN scheduled_time TYPE TIME;

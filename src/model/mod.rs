@@ -1,6 +1,7 @@
 pub mod account;
 pub mod permission;
 pub mod lesson;
+pub mod repeat;
 
 use sqlx::{pool::PoolConnection, postgres::PgConnection};
 

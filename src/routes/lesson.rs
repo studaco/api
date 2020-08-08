@@ -1,13 +1,15 @@
-use actix_web::{get, put, web, HttpRequest};
-use serde::Deserialize;
+use actix_web::{delete, get, patch, put, web, HttpRequest, HttpResponse};
+use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
-use uuid::Uuid;
 use std::vec::Vec;
+use uuid::Uuid;
 
 use crate::error::{APIError, Result};
-use crate::model::lesson::{Lesson, Repeat};
-use crate::model::permission::{LessonPermission};
+use crate::model::lesson::Lesson;
+use crate::model::permission::{LessonPermission, PermissionType};
+use crate::model::repeat::Repeat;
 use crate::token::authorize_headers;
+use crate::util::deserialize_optional_field;
 
 #[get("/lesson/{id}")]
 pub async fn get_lesson(
@@ -15,17 +17,17 @@ pub async fn get_lesson(
     lesson_id: web::Path<Uuid>,
     request: HttpRequest,
 ) -> Result<Lesson> {
-    let id = authorize_headers(request.headers())?;
+    let account_id = authorize_headers(request.headers())?;
 
     let lesson_id = lesson_id.into_inner();
 
-    LessonPermission::type_of_entity(db.get_ref(), &id, &lesson_id)
+    let lesson = Lesson::of_user(db.get_ref(), lesson_id).await?.ok_or(APIError::LessonDosNotExist)?;
+
+    LessonPermission::type_of_entity(db.get_ref(), &account_id, &lesson_id)
         .await?
         .ok_or(APIError::NoReadAccess)?;
 
-    let lesson = Lesson::of_user(db.get_ref(), lesson_id).await?;
-
-    Ok(lesson.ok_or(APIError::LessonDosNotExist)?.into())
+    Ok(lesson.into())
 }
 
 #[derive(Deserialize)]
@@ -39,17 +41,74 @@ pub struct LessonCreateRequest {
 pub async fn put_lesson(
     db: web::Data<PgPool>,
     lesson: web::Json<LessonCreateRequest>,
-    request: HttpRequest
+    request: HttpRequest,
 ) -> Result<Lesson> {
     let account_id = authorize_headers(request.headers())?;
-    let LessonCreateRequest { title, description, repeats } = lesson.into_inner();
-    Ok(Lesson::create(db.get_ref(), title, description, repeats, &account_id).await?.into())
+
+    let LessonCreateRequest {
+        title,
+        description,
+        repeats,
+    } = lesson.into_inner();
+    Ok(
+        Lesson::create(db.get_ref(), title, description, repeats, &account_id)
+            .await?
+            .into(),
+    )
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
+#[serde(default)]
+pub struct LessonUpdateRequest {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    title: Option<String>,
+    #[serde(deserialize_with = "deserialize_optional_field")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    description: Option<Option<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    repeats: Option<Vec<Repeat>>,
 }
 
 #[patch("/lesson/{id}")]
 pub async fn patch_lesson(
     db: web::Data<PgPool>,
     id: web::Path<Uuid>,
-    patch: web::Json<LessonCreateRequest>,
-    request: HttpRequest
-) -> Result<HttpResponse>
+    patch: web::Json<LessonUpdateRequest>,
+    request: HttpRequest,
+) -> std::result::Result<HttpResponse, APIError> {
+    let lesson_id = id.into_inner();
+    let account_id = authorize_headers(request.headers())?;
+
+    if let Some(PermissionType::ReadWrite) =
+        LessonPermission::type_of_entity(db.get_ref(), &account_id, &lesson_id).await?
+    {
+        let LessonUpdateRequest {
+            title,
+            repeats,
+            description,
+        } = patch.into_inner();
+        Lesson::update(db.get_ref(), &lesson_id, &title, &repeats, &description).await?;
+        Ok(HttpResponse::NoContent().finish())
+    } else {
+        Err(APIError::NoWriteAccess)
+    }
+}
+
+#[delete("/lesson/{id}")]
+pub async fn delete_lesson(
+    db: web::Data<PgPool>,
+    id: web::Path<Uuid>,
+    request: HttpRequest,
+) -> std::result::Result<HttpResponse, APIError> {
+    let lesson_id = id.into_inner();
+    let account_id = authorize_headers(request.headers())?;
+
+    if let Some(PermissionType::ReadWrite) =
+        LessonPermission::type_of_entity(db.get_ref(), &account_id, &lesson_id).await?
+    {
+        Lesson::delete(db.get_ref(), &lesson_id).await?;
+        Ok(HttpResponse::NoContent().finish())
+    } else {
+        Err(APIError::NoWriteAccess)
+    }
+}
