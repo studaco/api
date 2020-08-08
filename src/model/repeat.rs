@@ -7,9 +7,9 @@ use sqlx::{
 };
 use std::vec::Vec;
 use thiserror::Error;
-use uuid::Uuid;
 
 use super::Transaction;
+use super::lesson::LessonID;
 
 #[derive(Debug, Serialize_repr, Deserialize_repr, Copy, Clone, sqlx::Type)]
 #[repr(i32)]
@@ -105,7 +105,7 @@ impl<'c> sqlx::FromRow<'c, PgRow<'c>> for Repeat {
 }
 
 impl Repeat {
-    pub async fn of_lesson_in_transaction(transaction: &mut Transaction, lesson_id: &Uuid) -> sqlx::Result<Vec<Repeat>> {
+    pub async fn of_lesson_in_transaction(transaction: &mut Transaction, lesson_id: &LessonID) -> sqlx::Result<Vec<Repeat>> {
         sqlx::query_as(
             "SELECT every, week_day, scheduled_time FROM Repeats WHERE lesson_id = $1 ",
         )
@@ -117,7 +117,7 @@ impl Repeat {
     pub async fn insert_in_transaction(
         transaction: &mut Transaction,
         repeats: &Vec<Repeat>,
-        lesson_id: &Uuid,
+        lesson_id: &LessonID,
     ) -> sqlx::Result<()> {
         if !repeats.is_empty() {
             let values = (0..repeats.len())
@@ -160,7 +160,7 @@ impl Repeat {
     pub async fn update_in_transaction(
         transaction: &mut Transaction,
         repeats: &Vec<Repeat>,
-        lesson_id: &Uuid,
+        lesson_id: &LessonID,
     ) -> sqlx::Result<()> {
         Repeat::delete_in_transaction(transaction, lesson_id).await?;
         Repeat::insert_in_transaction(transaction, repeats, lesson_id).await
@@ -168,7 +168,7 @@ impl Repeat {
 
     pub async fn delete_in_transaction(
         transaction: &mut Transaction,
-        lesson_id: &Uuid,
+        lesson_id: &LessonID,
     ) -> sqlx::Result<()> {
         sqlx::query("DELETE FROM Repeats WHERE lesson_id = $1")
             .bind(lesson_id)

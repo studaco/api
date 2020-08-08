@@ -2,12 +2,11 @@ use actix_web::{delete, get, patch, put, web, HttpResponse};
 use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
 use std::vec::Vec;
-use uuid::Uuid;
 
 use crate::error::{APIError, Result};
 use crate::middleware::Authentication;
 use crate::model::{
-    lesson::Lesson,
+    lesson::{Lesson, LessonID},
     permission::{LessonPermission, PermissionType},
     repeat::Repeat,
     account::AccountID
@@ -17,7 +16,7 @@ use crate::util::deserialize_optional_field;
 #[get("/lesson/{id}", wrap = "Authentication")]
 pub async fn get_lesson(
     db: web::Data<PgPool>,
-    lesson_id: web::Path<Uuid>,
+    lesson_id: web::Path<LessonID>,
     account_id: AccountID,
 ) -> Result<Lesson> {
     let lesson_id = lesson_id.into_inner();
@@ -72,7 +71,7 @@ pub struct LessonUpdateRequest {
 #[patch("/lesson/{id}", wrap = "Authentication")]
 pub async fn patch_lesson(
     db: web::Data<PgPool>,
-    id: web::Path<Uuid>,
+    id: web::Path<LessonID>,
     patch: web::Json<LessonUpdateRequest>,
     account_id: AccountID,
 ) -> std::result::Result<HttpResponse, APIError> {
@@ -95,7 +94,7 @@ pub async fn patch_lesson(
 #[delete("/lesson/{id}", wrap = "Authentication")]
 pub async fn delete_lesson(
     db: web::Data<PgPool>,
-    id: web::Path<Uuid>,
+    id: web::Path<LessonID>,
     account_id: AccountID,
 ) -> std::result::Result<HttpResponse, APIError> {
     let lesson_id = id.into_inner();

@@ -1,5 +1,5 @@
-use serde::Serialize;
-use sqlx::postgres::{ PgPool, PgQueryAs, Postgres };
+use serde::{Serialize, Deserialize};
+use sqlx::postgres::{ PgPool, PgQueryAs, Postgres};
 use std::vec::Vec;
 use uuid::Uuid;
 
@@ -7,9 +7,13 @@ use super::permission::{LessonPermission, PermissionType};
 use super::repeat::Repeat;
 use super::account::AccountID;
 
+#[derive(Debug, Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Serialize, Deserialize, sqlx::Type)]
+#[sqlx(transparent)]
+pub struct LessonID(Uuid);
+
 #[derive(Serialize)]
 pub struct Lesson {
-    pub id: Uuid,
+    pub id: LessonID,
     pub title: String,
     pub description: Option<String>,
     pub repeats: Vec<Repeat>,
@@ -22,7 +26,7 @@ struct LessonBase {
 }
 
 impl Lesson {
-    pub async fn of_user(db: &PgPool, lesson_id: Uuid) -> sqlx::Result<Option<Lesson>> {
+    pub async fn of_user(db: &PgPool, lesson_id: LessonID) -> sqlx::Result<Option<Lesson>> {
         let mut transaction = db.begin().await?;
 
         let base = sqlx::query_as("SELECT title, description FROM Lesson WHERE id = $1")
@@ -57,7 +61,7 @@ impl Lesson {
     ) -> sqlx::Result<Lesson> {
         let mut transaction = db.begin().await?;
 
-        let (id,): (Uuid,) =
+        let (id,): (LessonID,) =
             sqlx::query_as("INSERT INTO Lesson (title, description) VALUES ($1,$2) RETURNING id")
                 .bind(&title)
                 .bind(&description)
@@ -86,7 +90,7 @@ impl Lesson {
 
     pub async fn update(
         db: &PgPool,
-        lesson_id: &Uuid,
+        lesson_id: &LessonID,
         title: &Option<String>,
         repeats: &Option<Vec<Repeat>>,
         description: &Option<Option<String>>,
@@ -121,7 +125,7 @@ impl Lesson {
         Ok(())
     }
 
-    pub async fn delete(db: &PgPool, lesson_id: &Uuid) -> sqlx::Result<()> {
+    pub async fn delete(db: &PgPool, lesson_id: &LessonID) -> sqlx::Result<()> {
         sqlx::query("DELETE FROM Lesson WHERE id = $1")
             .bind(lesson_id)
             .execute(db)

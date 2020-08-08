@@ -4,10 +4,10 @@ use sqlx::{
     Row,
 };
 use thiserror::Error;
-use uuid::Uuid;
 
 use super::Transaction;
 use super::account::AccountID;
+use super::lesson::LessonID;
 
 #[derive(Debug, sqlx::Type)]
 #[sqlx(rename = "permissiontype", rename_all = "lowercase")]
@@ -45,8 +45,8 @@ impl From<PgPermissionType> for PermissionType {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct LessonPermission {
     permission_type: PermissionType,
-    lesson_id: Uuid,
-    account_id: Uuid,
+    lesson_id: LessonID,
+    account_id: AccountID,
 }
 
 #[derive(Debug, Error)]
@@ -57,8 +57,8 @@ struct InvalidPermissionType {}
 impl<'c> sqlx::FromRow<'c, PgRow<'c>> for LessonPermission {
     fn from_row(row: &PgRow<'c>) -> sqlx::Result<Self> {
         let permission_type: PgPermissionType = row.try_get("type")?;
-        let lesson_id: Uuid = row.try_get("lesson_id")?;
-        let account_id: Uuid = row.try_get("account_id")?;
+        let lesson_id: LessonID = row.try_get("lesson_id")?;
+        let account_id: AccountID = row.try_get("account_id")?;
 
         Ok(LessonPermission {
             permission_type: permission_type.into(),
@@ -72,7 +72,7 @@ impl LessonPermission {
     pub async fn type_of_entity(
         db: &PgPool,
         account_id: &AccountID,
-        lesson_id: &Uuid,
+        lesson_id: &LessonID,
     ) -> sqlx::Result<Option<PermissionType>> {
         let res: Option<(PgPermissionType,)> = sqlx::query_as(
             "SELECT type FROM LessonPermission WHERE lesson_id = $1 AND account_id = $2",
@@ -88,7 +88,7 @@ impl LessonPermission {
     pub(crate) async fn save_in_transaction(
         transaction: &mut Transaction,
         permission_type: PermissionType,
-        lesson_id: &Uuid,
+        lesson_id: &LessonID,
         account_id: &AccountID,
     ) -> sqlx::Result<()> {
         let permission_type: PgPermissionType = permission_type.into();
