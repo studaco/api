@@ -1,3 +1,6 @@
+use actix_http::Payload;
+use actix_web::{FromRequest, HttpRequest};
+use futures::future::{ready, Ready};
 use serde::{Serialize, Deserialize};
 use sqlx::postgres::{ PgPool, PgQueryAs, Postgres};
 use std::vec::Vec;
@@ -6,10 +9,30 @@ use uuid::Uuid;
 use super::permission::{LessonPermission, PermissionType};
 use super::repeat::Repeat;
 use super::account::AccountID;
+use crate::error::APIError;
 
 #[derive(Debug, Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Serialize, Deserialize, sqlx::Type)]
 #[sqlx(transparent)]
 pub struct LessonID(Uuid);
+
+impl FromRequest for LessonID {
+    type Error = APIError;
+    type Future = Ready<Result<Self, Self::Error>>;
+    type Config = ();
+
+    fn from_request(req: &HttpRequest, _: &mut Payload) -> Self::Future {
+        ready(
+            req.extensions()
+                .get::<LessonID>()
+                .map(|id| id.clone())
+                .ok_or(APIError::InternalError {
+                    message: "Error encountered while extracting parameters"
+                        .to_string(),
+                }),
+        )
+    }
+}
+
 
 #[derive(Serialize)]
 pub struct Lesson {

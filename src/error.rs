@@ -35,8 +35,6 @@ pub enum APIError {
 
     #[error("Lesson does not exist")]
     LessonDosNotExist,
-    #[error("User does not exist")]
-    UserDoesNotExist,
 
     #[error("No read access")]
     NoReadAccess,
@@ -53,7 +51,7 @@ impl ResponseError for APIError {
     fn status_code(&self) -> StatusCode {
         match self {
             APIError::InternalError { message: _ } => StatusCode::INTERNAL_SERVER_ERROR,
-            APIError::UserDoesNotExist | APIError::LessonDosNotExist => StatusCode::NOT_FOUND,
+            APIError::LessonDosNotExist => StatusCode::NOT_FOUND,
             APIError::InvalidCredentials
             | APIError::InvalidToken
             | APIError::TokenExpired

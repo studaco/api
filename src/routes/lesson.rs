@@ -4,31 +4,27 @@ use sqlx::PgPool;
 use std::vec::Vec;
 
 use crate::error::{APIError, Result};
-use crate::middleware::Authentication;
+use crate::middleware::{Authentication, CheckLessonPermission, ExtractLessonID};
 use crate::model::{
+    account::AccountID,
     lesson::{Lesson, LessonID},
-    permission::{LessonPermission, PermissionType},
+    permission::PermissionType,
     repeat::Repeat,
-    account::AccountID
 };
+use crate::payload::Payload;
 use crate::util::deserialize_optional_field;
 
-#[get("/lesson/{id}", wrap = "Authentication")]
-pub async fn get_lesson(
-    db: web::Data<PgPool>,
-    lesson_id: web::Path<LessonID>,
-    account_id: AccountID,
-) -> Result<Lesson> {
-    let lesson_id = lesson_id.into_inner();
-    let lesson = Lesson::of_user(db.get_ref(), lesson_id)
+#[get(
+    "/lesson/{id}",
+    wrap = "CheckLessonPermission::new(PermissionType::Read)",
+    wrap = "ExtractLessonID",
+    wrap = "Authentication"
+)]
+pub async fn get_lesson(db: web::Data<PgPool>, lesson_id: LessonID) -> Result<Lesson> {
+    Lesson::of_user(db.get_ref(), lesson_id)
         .await?
-        .ok_or(APIError::LessonDosNotExist)?;
-
-    LessonPermission::type_of_entity(db.get_ref(), &account_id, &lesson_id)
-        .await?
-        .ok_or(APIError::NoReadAccess)?;
-
-    Ok(lesson.into())
+        .ok_or(APIError::LessonDosNotExist)
+        .map(Payload::from)
 }
 
 #[derive(Deserialize)]
@@ -68,45 +64,39 @@ pub struct LessonUpdateRequest {
     repeats: Option<Vec<Repeat>>,
 }
 
-#[patch("/lesson/{id}", wrap = "Authentication")]
+#[patch(
+    "/lesson/{id}",
+    wrap = "CheckLessonPermission::new(PermissionType::ReadWrite)",
+    wrap = "ExtractLessonID",
+    wrap = "Authentication"
+)]
 pub async fn patch_lesson(
     db: web::Data<PgPool>,
-    id: web::Path<LessonID>,
+    lesson_id: LessonID,
     patch: web::Json<LessonUpdateRequest>,
-    account_id: AccountID,
 ) -> std::result::Result<HttpResponse, APIError> {
-    let lesson_id = id.into_inner();
-    if let Some(PermissionType::ReadWrite) =
-        LessonPermission::type_of_entity(db.get_ref(), &account_id, &lesson_id).await?
-    {
-        let LessonUpdateRequest {
-            title,
-            repeats,
-            description,
-        } = patch.into_inner();
-        Lesson::update(db.get_ref(), &lesson_id, &title, &repeats, &description).await?;
-        Ok(HttpResponse::NoContent().finish())
-    } else {
-        Err(APIError::NoWriteAccess)
-    }
+    let LessonUpdateRequest {
+        title,
+        repeats,
+        description,
+    } = patch.into_inner();
+
+    Lesson::update(db.get_ref(), &lesson_id, &title, &repeats, &description).await?;
+    Ok(HttpResponse::NoContent().finish())
 }
 
-#[delete("/lesson/{id}", wrap = "Authentication")]
+#[delete(
+    "/lesson/{id}",
+    wrap = "CheckLessonPermission::new(PermissionType::ReadWrite)",
+    wrap = "ExtractLessonID",
+    wrap = "Authentication"
+)]
 pub async fn delete_lesson(
     db: web::Data<PgPool>,
-    id: web::Path<LessonID>,
-    account_id: AccountID,
+    lesson_id: LessonID,
 ) -> std::result::Result<HttpResponse, APIError> {
-    let lesson_id = id.into_inner();
-
-    if let Some(PermissionType::ReadWrite) =
-        LessonPermission::type_of_entity(db.get_ref(), &account_id, &lesson_id).await?
-    {
-        Lesson::delete(db.get_ref(), &lesson_id).await?;
-        Ok(HttpResponse::NoContent().finish())
-    } else {
-        Err(APIError::NoWriteAccess)
-    }
+    Lesson::delete(db.get_ref(), &lesson_id).await?;
+    Ok(HttpResponse::NoContent().finish())
 }
 
 pub fn configure_lesson_routes(cfg: &mut web::ServiceConfig) {

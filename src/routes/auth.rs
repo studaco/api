@@ -27,7 +27,7 @@ pub async fn login(
 
     let account = match account {
         Some(account) => account,
-        None => return Err(APIError::UserDoesNotExist),
+        None => return Err(APIError::InvalidCredentials),
     };
 
     let verification = bcrypt::verify(password, &account.password_hash[..])?;

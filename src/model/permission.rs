@@ -1,3 +1,6 @@
+use actix_http::Payload;
+use actix_web::{FromRequest, HttpRequest};
+use futures::future::{ready, Ready};
 use serde::{Deserialize, Serialize};
 use sqlx::{
     postgres::{PgPool, PgQueryAs, PgRow},
@@ -5,9 +8,10 @@ use sqlx::{
 };
 use thiserror::Error;
 
-use super::Transaction;
 use super::account::AccountID;
 use super::lesson::LessonID;
+use super::Transaction;
+use crate::error::APIError;
 
 #[derive(Debug, sqlx::Type)]
 #[sqlx(rename = "permissiontype", rename_all = "lowercase")]
@@ -25,7 +29,7 @@ impl From<PermissionType> for PgPermissionType {
     }
 }
 
-#[derive(Debug, Deserialize, Serialize, Copy, Clone)]
+#[derive(Debug, Deserialize, Serialize, Copy, Clone, Eq, PartialEq)]
 pub enum PermissionType {
     #[serde(rename = "r")]
     Read,
@@ -42,12 +46,31 @@ impl From<PgPermissionType> for PermissionType {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Copy, Clone)]
 pub struct LessonPermission {
-    permission_type: PermissionType,
-    lesson_id: LessonID,
-    account_id: AccountID,
+    pub permission_type: PermissionType,
+    pub lesson_id: LessonID,
+    pub account_id: AccountID,
 }
+
+impl FromRequest for LessonPermission {
+    type Error = APIError;
+    type Future = Ready<std::result::Result<LessonPermission, APIError>>;
+    type Config = ();
+
+    fn from_request(req: &HttpRequest, _: &mut Payload) -> Self::Future {
+        ready(
+            req.extensions()
+                .get::<LessonPermission>()
+                .map(|id| id.clone())
+                .ok_or(APIError::InternalError {
+                    message: "Error encountered while processing permission checks"
+                        .to_string(),
+                }),
+        )
+    }
+}
+
 
 #[derive(Debug, Error)]
 #[error("Invalid Permission Type. Should be either \"r\" or \"rw\"")]
@@ -68,12 +91,59 @@ impl<'c> sqlx::FromRow<'c, PgRow<'c>> for LessonPermission {
     }
 }
 
+#[derive(Error, Debug)]
+pub enum PermissionError {
+    #[error("Entity not present")]
+    LessonNotPresent,
+    #[error("Permission not present")]
+    PermissionNotPresent,
+    #[error("sqlx error occured while fetching permission ({0})")]
+    Sqlx(#[from] sqlx::Error),
+}
+
+impl From<PermissionError> for APIError {
+    fn from(error: PermissionError) -> APIError {
+        match error {
+            PermissionError::LessonNotPresent => APIError::LessonDosNotExist,
+            PermissionError::PermissionNotPresent => APIError::NoReadAccess,
+            PermissionError::Sqlx(error) => error.into(),
+        }
+    }
+}
+
+type Result<T> = std::result::Result<T, PermissionError>;
+
 impl LessonPermission {
+    pub async fn of_entity(
+        db: &PgPool,
+        account_id: AccountID,
+        lesson_id: LessonID,
+    ) -> Result<LessonPermission> {
+        LessonPermission::type_of_entity(db, &account_id, &lesson_id)
+            .await
+            .map(|permission_type| LessonPermission {
+                permission_type,
+                account_id,
+                lesson_id,
+            })
+    }
+
     pub async fn type_of_entity(
         db: &PgPool,
         account_id: &AccountID,
         lesson_id: &LessonID,
-    ) -> sqlx::Result<Option<PermissionType>> {
+    ) -> Result<PermissionType> {
+        let mut transaction = db.begin().await?;
+        let (entity_exists,): (bool,) =
+            sqlx::query_as("SELECT EXISTS (SELECT FROM Lesson WHERE id = $1)")
+                .bind(lesson_id)
+                .fetch_one(&mut transaction)
+                .await?;
+
+        if !entity_exists {
+            return Err(PermissionError::LessonNotPresent);
+        }
+
         let res: Option<(PgPermissionType,)> = sqlx::query_as(
             "SELECT type FROM LessonPermission WHERE lesson_id = $1 AND account_id = $2",
         )
@@ -82,7 +152,8 @@ impl LessonPermission {
         .fetch_optional(db)
         .await?;
 
-        Ok(res.map(|(permission_type,)| permission_type.into()))
+        res.ok_or(PermissionError::PermissionNotPresent)
+            .map(|(permission_type,)| permission_type.into())
     }
 
     pub(crate) async fn save_in_transaction(
