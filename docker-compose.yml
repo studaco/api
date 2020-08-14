@@ -1,0 +1,30 @@
+version: '3'
+services:
+  postgres:
+    image: postgres:12-alpine
+    networks:
+      - ne-student-network
+    container_name: postgres
+    environment:
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_USER: ${DB_USER}
+      POSRGRES_DB: nestudent
+  
+  api:
+    image: ne-student/api
+    container_name: api
+    networks:
+      - ne-student-network
+    environment:
+      PORT: 5505
+      HOST: 0.0.0.0
+      DATABASE_URL: postgresql://${DB_USER}:${DB_PASSWORD}@postgres/nestudent
+      RUST_LOG: actix,ne-student-api
+      TOKEN_SECRET: ${TOKEN_SECRET}
+    ports:
+      - ${PORT}:5505
+    depends_on: 
+      - postgres
+
+networks:
+  ne-student-network:

@@ -1,5 +1,3 @@
-#![feature(try_trait)]
-#![feature(async_closure)]
 use actix_web::{App, HttpServer, middleware::{Compress, Logger, NormalizePath}};
 use anyhow::Result;
 use dotenv::dotenv;
