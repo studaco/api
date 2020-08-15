@@ -1,4 +1,4 @@
-use actix_web::{App, HttpServer, middleware::{Compress, Logger, NormalizePath}};
+use actix_web::{App, HttpServer, middleware::{Compress, Logger, NormalizePath}, web};
 use anyhow::Result;
 use dotenv::dotenv;
 use include_dir::{include_dir, Dir};
@@ -54,9 +54,13 @@ async fn main() -> Result<()> {
     wait_for_db(|| migrate(&db_url, &MIGRATIONS)).await;
 
     let pool = wait_for_db(|| PgPool::new(&db_url)).await;
+    
 
     let mut server = HttpServer::new(move || {
         App::new()
+            .app_data(web::JsonConfig::default().error_handler(error::json_error_handler))
+            .app_data(web::PathConfig::default().error_handler(error::path_error_handler))
+            .app_data(web::QueryConfig::default().error_handler(error::query_error_handler))
             .data(pool.clone())
             .wrap(Compress::default())
             .wrap(NormalizePath)

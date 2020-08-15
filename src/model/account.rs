@@ -6,6 +6,7 @@ use serde::{Serialize, Deserialize};
 use sqlx::{postgres::PgQueryAs, PgPool};
 use thiserror::Error;
 use uuid::Uuid;
+use indoc::indoc;
 
 use crate::error::APIError;
 
@@ -62,9 +63,10 @@ impl From<RegistrationError> for APIError {
 
 impl Account {
     pub async fn get_by_login(db: &PgPool, login: String) -> sqlx::Result<Option<Account>> {
-        sqlx::query_as(
-            r#"SELECT id, first_name, last_name, login, password_hash 
-        FROM Account WHERE login = $1"#)
+        sqlx::query_as(indoc! {"
+            SELECT id, first_name, last_name, login, password_hash 
+            FROM Account WHERE login = $1
+        "})
         .bind(&login)
         .fetch_optional(db)
         .await
@@ -89,12 +91,12 @@ impl Account {
             return Err(RegistrationError::LoginNotUnique);
         }
 
-        let (id,): (AccountID,) = sqlx::query_as(
-            r#"INSERT 
-        INTO Account (first_name, last_name, login, password_hash)
-        VALUES ($1, $2, $3, $4) 
-        RETURNING id"#,
-        )
+        let (id,): (AccountID,) = sqlx::query_as(indoc! {"
+            INSERT 
+            INTO Account (first_name, last_name, login, password_hash)
+            VALUES ($1, $2, $3, $4) 
+            RETURNING id
+        "})
         .bind(&first_name)
         .bind(&last_name)
         .bind(&login)

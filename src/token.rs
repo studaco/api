@@ -7,7 +7,7 @@ use std::env;
 use std::vec::Vec;
 use uuid::Uuid;
 
-use crate::error::APIError;
+use crate::error::{APIError, RequestScope};
 use crate::model::account::AccountID;
 
 #[derive(Serialize, Deserialize, Copy, Clone, Debug)]
@@ -42,7 +42,8 @@ pub fn authenticate_claim_from_headers(headers: &HeaderMap) -> Result<Claim, API
         .ok_or(APIError::NoTokenPresent)?;
 
     let header = header_value.to_str().map_err(|err| APIError::BadRequest {
-        message: Some(format!("{}", err)),
+        message: format!("{}", err),
+        scope: Some(RequestScope::Header)
     })?;
 
     let values: Vec<&str> = header.split_ascii_whitespace().collect();

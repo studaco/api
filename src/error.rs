@@ -1,5 +1,9 @@
 use actix_http::ResponseBuilder;
-use actix_web::{http::StatusCode, HttpResponse, ResponseError};
+use actix_web::{
+    error::{JsonPayloadError, PathError, QueryPayloadError},
+    http::StatusCode,
+    HttpRequest, HttpResponse, ResponseError,
+};
 use bcrypt::BcryptError;
 use jwt;
 use serde::Serialize;
@@ -31,7 +35,14 @@ pub enum APIError {
     TokenRevoked,
 
     #[error("Bad request")]
-    BadRequest { message: Option<String> },
+    BadRequest {
+        message: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        #[serde(rename="in")]
+        scope: Option<RequestScope>,
+    },
+    #[error("Payload too large")]
+    PayloadTooLarge,
 
     #[error("Lesson does not exist")]
     LessonDosNotExist,
@@ -40,6 +51,15 @@ pub enum APIError {
     NoReadAccess,
     #[error("No write access")]
     NoWriteAccess,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum RequestScope {
+    Body,
+    Query,
+    Header,
+    Path,
 }
 
 #[derive(Serialize)]
@@ -58,8 +78,12 @@ impl ResponseError for APIError {
             | APIError::TokenRevoked
             | APIError::NoTokenPresent
             | APIError::LoginAlreadyPresent => StatusCode::UNAUTHORIZED,
-            APIError::BadRequest { message: _ } => StatusCode::BAD_REQUEST,
+            APIError::BadRequest {
+                message: _,
+                scope: _,
+            } => StatusCode::BAD_REQUEST,
             APIError::NoReadAccess | APIError::NoWriteAccess => StatusCode::FORBIDDEN,
+            APIError::PayloadTooLarge => StatusCode::PAYLOAD_TOO_LARGE,
         }
     }
 
@@ -114,3 +138,39 @@ impl<T, E: std::error::Error> IntoAPIResult<T> for std::result::Result<T, E> {
 }
 
 pub type Result<T> = std::result::Result<Payload<T>, APIError>;
+
+pub fn json_error_handler(error: JsonPayloadError, _: &HttpRequest) -> actix_web::Error {
+    match error {
+        JsonPayloadError::Overflow => APIError::PayloadTooLarge,
+        JsonPayloadError::Deserialize(error) => APIError::BadRequest {
+            message: format!("{}", error),
+            scope: Some(RequestScope::Body),
+        },
+        _ => APIError::BadRequest {
+            message: format!("{}", error),
+            scope: Some(RequestScope::Body),
+        },
+    }
+    .into()
+}
+
+pub fn path_error_handler(
+    PathError::Deserialize(error): PathError,
+    _: &HttpRequest,
+) -> actix_web::Error {
+    APIError::BadRequest {
+        message: format!("{}", error),
+        scope: Some(RequestScope::Path),
+    }
+    .into()
+}
+
+pub fn query_error_handler(
+    QueryPayloadError::Deserialize(error): QueryPayloadError,
+    _: &HttpRequest
+) -> actix_web::Error {
+    APIError::BadRequest {
+        message: format!("{}", error),
+        scope: Some(RequestScope::Query)
+    }.into()
+}

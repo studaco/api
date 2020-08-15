@@ -16,7 +16,7 @@ Attempts to learn Rust on a real-world example. Plus making a somewhat descent p
 4. `cargo make dev`
 
 ### How to deploy this bad boi?
-`docker-compose up`.
+`docker-compose up`. You don't even need to clone repo. Just yoink the `docker-compose.yml`.  
 Make sure you have docker, and docker-compose installed. duh.
 You would need to populate following env variables. _Trick with `.env` file still works_
 - `DB_USER` - postgres admin username
