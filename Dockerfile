@@ -17,6 +17,6 @@ RUN apt-get update && apt-get -y install ca-certificates libssl-dev && rm -rf /v
 WORKDIR /usr/ne-student-api
 COPY --from=builder /usr/ne-student-api/target/release/ne-student-api .
 
-EXPOSE 5505
+EXPOSE ${PORT}
 
 CMD ./ne-student-api

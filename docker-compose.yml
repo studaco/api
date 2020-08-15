@@ -11,7 +11,7 @@ services:
       POSRGRES_DB: nestudent
   
   api:
-    image: ne-student/api
+    image: malien/ne-student-api
     container_name: api
     networks:
       - ne-student-network
