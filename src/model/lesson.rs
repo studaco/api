@@ -9,6 +9,7 @@ use uuid::Uuid;
 use super::permission::{LessonPermission, PermissionType};
 use super::repeat::Repeat;
 use super::account::AccountID;
+use super::single_occurance::SingleOccurance;
 use crate::error::APIError;
 
 #[derive(Debug, Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Serialize, Deserialize, sqlx::Type)]
@@ -40,6 +41,7 @@ pub struct Lesson {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
     pub repeats: Vec<Repeat>,
+    pub singles: Vec<SingleOccurance>
 }
 
 #[derive(sqlx::FromRow)]
@@ -61,12 +63,14 @@ impl Lesson {
             None => None,
             Some(LessonBase { description, title }) => {
                 let repeats = Repeat::of_lesson_in_transaction(&mut transaction, &lesson_id).await?;
+                let singles = SingleOccurance::of_lesson_in_transaction(&mut transaction, &lesson_id).await?;
 
                 let res = Lesson {
                     id: lesson_id,
                     title,
                     description,
                     repeats,
+                    singles,
                 };
 
                 transaction.commit().await?;
@@ -80,6 +84,7 @@ impl Lesson {
         title: String,
         description: Option<String>,
         repeats: Vec<Repeat>,
+        singles: Vec<SingleOccurance>,
         owner: &AccountID,
     ) -> sqlx::Result<Lesson> {
         let mut transaction = db.begin().await?;
@@ -92,6 +97,7 @@ impl Lesson {
                 .await?;
 
         Repeat::insert_in_transaction(&mut transaction, &repeats, &id).await?;
+        SingleOccurance::insert_in_transaction(&mut transaction, &singles, &id).await?;
 
         LessonPermission::save_in_transaction(
             &mut transaction,
@@ -108,6 +114,7 @@ impl Lesson {
             description,
             title,
             repeats,
+            singles,
         })
     }
 
@@ -116,6 +123,7 @@ impl Lesson {
         lesson_id: &LessonID,
         title: &Option<String>,
         repeats: &Option<Vec<Repeat>>,
+        singles: &Option<Vec<SingleOccurance>>,
         description: &Option<Option<String>>,
     ) -> sqlx::Result<()> {
         let mut transaction = db.begin().await?;
@@ -141,6 +149,10 @@ impl Lesson {
 
         if let Some(repeats) = repeats {
             Repeat::update_in_transaction(&mut transaction, repeats, lesson_id).await?;
+        }
+
+        if let Some(singles) = singles {
+            SingleOccurance::update_in_transaction(&mut transaction, singles, lesson_id).await?;
         }
 
         transaction.commit().await?;

@@ -79,6 +79,9 @@ struct WrongRepetitionFrequency {}
 impl<'c> sqlx::FromRow<'c, PgRow<'c>> for Repeat {
     fn from_row(row: &PgRow<'c>) -> sqlx::Result<Self> {
         let every = row.try_get("every")?;
+        if every <= 0 {
+            return Err(sqlx::Error::Decode(Box::new(WrongRepetitionFrequency {})));
+        }
         let day: PgWeekDay = row.try_get("week_day")?;
         let time = row.try_get("scheduled_time")?;
         let start_day = row.try_get("start_day")?;
@@ -99,7 +102,7 @@ impl Repeat {
         transaction: &mut Transaction,
         lesson_id: &LessonID,
     ) -> sqlx::Result<Vec<Repeat>> {
-        sqlx::query_as("SELECT every, week_day, scheduled_time FROM Repeats WHERE lesson_id = $1")
+        sqlx::query_as("SELECT every, week_day, scheduled_time, start_day, end_day FROM Repeats WHERE lesson_id = $1")
             .bind(lesson_id)
             .fetch_all(transaction)
             .await
@@ -112,8 +115,18 @@ impl Repeat {
     ) -> sqlx::Result<()> {
         if !repeats.is_empty() {
             let values = (0..repeats.len())
-                .map(|_| "(?, ?, ?, ?, ?, ?)")
-                .collect::<Vec<&'static str>>()
+                .map(|i| {
+                    format!(
+                        "(${}, ${}, ${}, ${}, ${}, ${})",
+                        i * 6 + 1,
+                        i * 6 + 2,
+                        i * 6 + 3,
+                        i * 6 + 4,
+                        i * 6 + 5,
+                        i * 6 + 6,
+                    )
+                })
+                .collect::<Vec<String>>()
                 .join(",");
 
             let sql = format!(

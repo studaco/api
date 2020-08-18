@@ -1,6 +1,6 @@
 # Ne Student API
 
-Attempts to learn Rust on a real-world example. Plus making a somewhat descent product.
+Attempts to learn Rust on a real-world example. Plus making a somewhat decent product.
 
 ### How would one go about building this one?
 `cargo build`. duh...

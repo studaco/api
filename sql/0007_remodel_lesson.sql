@@ -1,8 +1,10 @@
 ALTER TABLE Repeats 
     ALTER COLUMN every SET DEFAULT 7,
-    ADD COLUMN start_day DATE NOT NULL,
+    ADD COLUMN start_day DATE NOT NULL DEFAULT CURRENT_DATE,
     ADD COLUMN end_day DATE;
 
+ALTER TABLE Repeats
+    ALTER COLUMN start_day DROP DEFAULT;
 -- INDEXES
 CREATE INDEX repeats_idx_start_day ON Repeats(start_day);
 CREATE INDEX repeats_idx_end_day ON Repeats(end_day);

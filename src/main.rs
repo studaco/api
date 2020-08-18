@@ -56,7 +56,6 @@ async fn main() -> Result<()> {
     wait_for_db(|| migrate(&db_url, &MIGRATIONS)).await;
 
     let pool = wait_for_db(|| PgPool::new(&db_url)).await;
-    
 
     let mut server = HttpServer::new(move || {
         App::new()

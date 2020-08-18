@@ -10,6 +10,7 @@ use crate::model::{
     lesson::{Lesson, LessonID},
     permission::PermissionType,
     repeat::Repeat,
+    single_occurance::SingleOccurance,
 };
 use crate::payload::Payload;
 use crate::util::deserialize_optional_field;
@@ -31,7 +32,8 @@ pub async fn get_lesson(db: web::Data<PgPool>, lesson_id: LessonID) -> Result<Le
 pub struct LessonCreateRequest {
     title: String,
     description: Option<String>,
-    repeats: Vec<Repeat>,
+    repeats: Option<Vec<Repeat>>,
+    singles: Option<Vec<SingleOccurance>>,
 }
 
 #[put("/lesson", wrap = "Authentication")]
@@ -44,12 +46,18 @@ pub async fn put_lesson(
         title,
         description,
         repeats,
+        singles,
     } = lesson.into_inner();
-    Ok(
-        Lesson::create(db.get_ref(), title, description, repeats, &account_id)
-            .await?
-            .into(),
+    Ok(Lesson::create(
+        db.get_ref(),
+        title,
+        description,
+        repeats.unwrap_or_default(),
+        singles.unwrap_or_default(),
+        &account_id,
     )
+    .await?
+    .into())
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
@@ -62,6 +70,8 @@ pub struct LessonUpdateRequest {
     description: Option<Option<String>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     repeats: Option<Vec<Repeat>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    singles: Option<Vec<SingleOccurance>>,
 }
 
 #[patch(
@@ -79,9 +89,18 @@ pub async fn patch_lesson(
         title,
         repeats,
         description,
+        singles,
     } = patch.into_inner();
 
-    Lesson::update(db.get_ref(), &lesson_id, &title, &repeats, &description).await?;
+    Lesson::update(
+        db.get_ref(),
+        &lesson_id,
+        &title,
+        &repeats,
+        &singles,
+        &description,
+    )
+    .await?;
     Ok(HttpResponse::NoContent().finish())
 }
 
