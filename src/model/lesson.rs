@@ -33,11 +33,11 @@ impl FromRequest for LessonID {
     }
 }
 
-
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Lesson {
     pub id: LessonID,
     pub title: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
     pub repeats: Vec<Repeat>,
 }

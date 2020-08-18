@@ -1,4 +1,4 @@
-use chrono::{NaiveTime, Timelike};
+use chrono::{NaiveDate, NaiveTime};
 use serde::{Deserialize, Serialize};
 use serde_repr::{Deserialize_repr, Serialize_repr};
 use sqlx::{
@@ -8,15 +8,8 @@ use sqlx::{
 use std::vec::Vec;
 use thiserror::Error;
 
-use super::Transaction;
 use super::lesson::LessonID;
-
-#[derive(Debug, Serialize_repr, Deserialize_repr, Copy, Clone, sqlx::Type)]
-#[repr(i32)]
-pub enum RepetitionFrequency {
-    Weekly = 1,
-    BiWeekly = 2,
-}
+use super::Transaction;
 
 #[derive(Debug, Copy, Clone, sqlx::Type)]
 #[sqlx(rename = "weekday")]
@@ -71,16 +64,12 @@ impl From<PgWeekDay> for WeekDay {
 }
 
 #[derive(Serialize, Deserialize, Debug, Copy, Clone)]
-pub struct Time {
-    minute: u8,
-    hour: u8,
-}
-
-#[derive(Serialize, Deserialize, Debug, Copy, Clone)]
 pub struct Repeat {
-    every: RepetitionFrequency,
+    every: i32,
     day: WeekDay,
-    time: Time,
+    time: NaiveTime,
+    start_day: NaiveDate,
+    end_day: Option<NaiveDate>,
 }
 
 #[derive(Debug, Error)]
@@ -89,29 +78,31 @@ struct WrongRepetitionFrequency {}
 
 impl<'c> sqlx::FromRow<'c, PgRow<'c>> for Repeat {
     fn from_row(row: &PgRow<'c>) -> sqlx::Result<Self> {
-        let every: RepetitionFrequency = row.try_get("every")?;
+        let every = row.try_get("every")?;
         let day: PgWeekDay = row.try_get("week_day")?;
-        let time: NaiveTime = row.try_get("scheduled_time")?;
+        let time = row.try_get("scheduled_time")?;
+        let start_day = row.try_get("start_day")?;
+        let end_day = row.try_get("end_day")?;
 
         Ok(Repeat {
             every,
             day: day.into(),
-            time: Time {
-                minute: time.minute() as u8,
-                hour: time.hour() as u8,
-            },
+            time,
+            start_day,
+            end_day,
         })
     }
 }
 
 impl Repeat {
-    pub async fn of_lesson_in_transaction(transaction: &mut Transaction, lesson_id: &LessonID) -> sqlx::Result<Vec<Repeat>> {
-        sqlx::query_as(
-            "SELECT every, week_day, scheduled_time FROM Repeats WHERE lesson_id = $1 ",
-        )
-        .bind(lesson_id)
-        .fetch_all(transaction)
-        .await
+    pub async fn of_lesson_in_transaction(
+        transaction: &mut Transaction,
+        lesson_id: &LessonID,
+    ) -> sqlx::Result<Vec<Repeat>> {
+        sqlx::query_as("SELECT every, week_day, scheduled_time FROM Repeats WHERE lesson_id = $1")
+            .bind(lesson_id)
+            .fetch_all(transaction)
+            .await
     }
 
     pub async fn insert_in_transaction(
@@ -121,21 +112,12 @@ impl Repeat {
     ) -> sqlx::Result<()> {
         if !repeats.is_empty() {
             let values = (0..repeats.len())
-                .map(|i| {
-                    format!(
-                        "(${}, ${}, ${}, ${})",
-                        i * 4 + 1,
-                        i * 4 + 2,
-                        i * 4 + 3,
-                        i * 4 + 4
-                    )
-                    .to_string()
-                })
-                .collect::<Vec<String>>()
+                .map(|_| "(?, ?, ?, ?, ?, ?)")
+                .collect::<Vec<&'static str>>()
                 .join(",");
 
             let sql = format!(
-                "INSERT INTO Repeats (every, week_day, scheduled_time, lesson_id) VALUES {}",
+                "INSERT INTO Repeats (every, week_day, scheduled_time, lesson_id, start_day, end_day) VALUES {}",
                 values
             );
 
@@ -144,12 +126,19 @@ impl Repeat {
             for Repeat {
                 every,
                 day,
-                time: Time { hour, minute },
+                time,
+                start_day,
+                end_day,
             } in repeats
             {
-                let time = NaiveTime::from_hms(hour.clone() as u32, minute.clone() as u32, 0);
                 let week_day: PgWeekDay = day.clone().into();
-                query = query.bind(every).bind(week_day).bind(time).bind(lesson_id);
+                query = query
+                    .bind(every)
+                    .bind(week_day)
+                    .bind(time)
+                    .bind(lesson_id)
+                    .bind(start_day)
+                    .bind(end_day);
             }
             query.execute(transaction).await?;
         }

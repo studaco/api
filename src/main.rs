@@ -48,6 +48,8 @@ async fn main() -> Result<()> {
 
     let mut listenfd = ListenFd::from_env();
 
+    log::info!("Heya");
+
     let db_url: String =
         env::var("DATABASE_URL").expect("DATABASE_URL variable is not set properly");
 
