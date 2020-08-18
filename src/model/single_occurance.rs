@@ -1,11 +1,9 @@
-use chrono::{NaiveDateTime, NaiveDate};
+use chrono::NaiveDateTime;
 use serde::{Deserialize, Serialize};
 use sqlx::postgres::PgQueryAs;
 use std::vec::Vec;
-use indoc::indoc;
 
 use super::lesson::LessonID;
-use super::account::AccountID;
 use super::Transaction;
 
 #[derive(Serialize, Deserialize, Debug, Copy, Clone, Ord, PartialOrd, Eq, PartialEq, sqlx::Type)]
@@ -73,21 +71,4 @@ impl SingleOccurance {
             .map(|_| ())
     }
 
-    // pub async fn lesson_ids_at_date_in_transaction(
-    //     transaction: &mut Transaction,
-    //     date: &NaiveDate,
-    //     account_id: &AccountID,
-    // ) -> sqlx::Result<Vec<LessonID>> {
-    //     sqlx::query_as(indoc!{"
-    //         SELECT DISTINCT lesson_id FROM SingleOccurance 
-    //         WHERE 
-    //             occures_at BETWEEN $1 AND $1 + 1 AND
-    //             lesson_permission_for(lesson_id, $2) = 'r'::PermissionType
-    //     "})
-    //         .bind(date)
-    //         .bind(account_id)
-    //         .fetch_all(transaction)
-    //         .await
-    //         .map(|vec| vec.into_iter().map(|(lesson_id,)| lesson_id).collect())
-    // }
 }

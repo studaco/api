@@ -1,15 +1,9 @@
 use chrono::{NaiveDate, NaiveTime};
-use indoc::indoc;
 use serde::{Deserialize, Serialize};
 use serde_repr::{Deserialize_repr, Serialize_repr};
-use sqlx::{
-    postgres::{PgQueryAs, PgRow},
-    Row,
-};
+use sqlx::postgres::PgQueryAs;
 use std::vec::Vec;
-use thiserror::Error;
 
-use super::account::AccountID;
 use super::lesson::LessonID;
 use super::Transaction;
 
@@ -115,21 +109,4 @@ impl Repeat {
             .map(|_| ())
     }
 
-    // pub async fn lesson_ids_at_date_in_transaction(
-    //     transaction: &mut Transaction,
-    //     date: NaiveDate,
-    //     account_id: AccountID,
-    // ) -> sqlx::Result<Vec<LessonID>> {
-    //     sqlx::query_as::<_, (LessonID,)>(indoc! {"
-    //         SELECT DISTINCT lesson_id FROM Repeats 
-    //         WHERE 
-    //             repeats_on_date(start_day, end_day, week_day, every, $1) AND 
-    //             lesson_permission_for(lesson_id, $2) = 'r'::PermissionType
-    //     "})
-    //     .bind(date)
-    //     .bind(account_id)
-    //     .fetch_all(transaction)
-    //     .await
-    //     .map(|vec| vec.into_iter().map(|(lesson_id,)| lesson_id).collect())
-    // }
 }

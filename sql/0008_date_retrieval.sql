@@ -32,6 +32,10 @@ CREATE OR REPLACE FUNCTION lesson_permission_for(lesson_id UUID, account_id UUID
     SELECT type FROM LessonPermission WHERE lesson_id = lesson_id AND account_id = account_id
 $$ LANGUAGE SQL STABLE;
 
+CREATE OR REPLACE FUNCTION is_read_permission(permission PermissionType) RETURNS BOOLEAN AS $$
+    SELECT permission = 'r'::PermissionType OR permission = 'rw'::PermissionType
+$$ LANGUAGE SQL STABLE;
+
 ALTER TABLE Repeats
     ALTER COLUMN week_day TYPE SMALLINT USING weekday_number(week_day);
 
