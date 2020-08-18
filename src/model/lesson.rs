@@ -5,6 +5,8 @@ use serde::{Serialize, Deserialize};
 use sqlx::postgres::{ PgPool, PgQueryAs, Postgres};
 use std::vec::Vec;
 use uuid::Uuid;
+use chrono::{NaiveDate, Datelike};
+use indoc::indoc;
 
 use super::permission::{LessonPermission, PermissionType};
 use super::repeat::Repeat;
@@ -166,5 +168,23 @@ impl Lesson {
             .execute(db)
             .await
             .map(|_| ())
+    }
+
+    pub async fn for_date(db: &PgPool, date: &NaiveDate, account_id: &AccountID) -> sqlx::Result<Vec<LessonID>> {
+        sqlx::query_as::<_, (LessonID,)>(indoc! {"
+            SELECT lesson_id FROM (
+                SELECT DISTINCT lesson_id FROM Repeats 
+                WHERE repeats_on_date(start_day, end_day, week_day, every, $1)
+                UNION
+                SELECT DISTINCT lesson_id FROM SingleOccurance 
+                WHERE occures_at BETWEEN $1 AND $1 + 1
+            ) x
+            WHERE lesson_permission_for(x.lesson_id, $2) = 'r'::PermissionType
+        "})
+        .bind(date)
+        .bind(account_id)
+        .fetch_all(db)
+        .await
+        .map(|vec| vec.into_iter().map(|(lesson_id,)| lesson_id).collect())
     }
 }

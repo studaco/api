@@ -96,7 +96,7 @@ impl ResponseError for APIError {
 
 impl From<sqlx::Error> for APIError {
     fn from(error: sqlx::Error) -> Self {
-        log::debug!("{:?}", error);
+        log::debug!("Conversion occured from sqlx::Error to the APIError: {:?}", error);
         APIError::InternalError {
             message: format!("{}", error),
         }

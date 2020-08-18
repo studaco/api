@@ -1,4 +1,5 @@
 use chrono::{NaiveDate, NaiveTime};
+use indoc::indoc;
 use serde::{Deserialize, Serialize};
 use serde_repr::{Deserialize_repr, Serialize_repr};
 use sqlx::{
@@ -8,37 +9,12 @@ use sqlx::{
 use std::vec::Vec;
 use thiserror::Error;
 
+use super::account::AccountID;
 use super::lesson::LessonID;
 use super::Transaction;
 
-#[derive(Debug, Copy, Clone, sqlx::Type)]
-#[sqlx(rename = "weekday")]
-enum PgWeekDay {
-    MON,
-    TUE,
-    WED,
-    THU,
-    FRI,
-    SAT,
-    SUN,
-}
-
-impl From<WeekDay> for PgWeekDay {
-    fn from(week_day: WeekDay) -> Self {
-        match week_day {
-            WeekDay::Monday => PgWeekDay::MON,
-            WeekDay::Tuesday => PgWeekDay::TUE,
-            WeekDay::Wednesday => PgWeekDay::WED,
-            WeekDay::Thursday => PgWeekDay::THU,
-            WeekDay::Friday => PgWeekDay::FRI,
-            WeekDay::Saturday => PgWeekDay::SAT,
-            WeekDay::Sunday => PgWeekDay::SUN,
-        }
-    }
-}
-
-#[derive(Debug, Copy, Clone, Serialize_repr, Deserialize_repr)]
-#[repr(u8)]
+#[derive(Debug, Copy, Clone, Serialize_repr, Deserialize_repr, sqlx::Type)]
+#[repr(i16)]
 pub enum WeekDay {
     Monday = 1,
     Tuesday = 2,
@@ -49,52 +25,13 @@ pub enum WeekDay {
     Sunday = 7,
 }
 
-impl From<PgWeekDay> for WeekDay {
-    fn from(week_day: PgWeekDay) -> Self {
-        match week_day {
-            PgWeekDay::MON => WeekDay::Monday,
-            PgWeekDay::TUE => WeekDay::Tuesday,
-            PgWeekDay::WED => WeekDay::Wednesday,
-            PgWeekDay::THU => WeekDay::Thursday,
-            PgWeekDay::FRI => WeekDay::Friday,
-            PgWeekDay::SAT => WeekDay::Saturday,
-            PgWeekDay::SUN => WeekDay::Sunday,
-        }
-    }
-}
-
-#[derive(Serialize, Deserialize, Debug, Copy, Clone)]
+#[derive(Serialize, Deserialize, Debug, Copy, Clone, sqlx::FromRow)]
 pub struct Repeat {
     every: i32,
-    day: WeekDay,
+    week_day: WeekDay,
     time: NaiveTime,
     start_day: NaiveDate,
     end_day: Option<NaiveDate>,
-}
-
-#[derive(Debug, Error)]
-#[error("Wrong repetition frequency")]
-struct WrongRepetitionFrequency {}
-
-impl<'c> sqlx::FromRow<'c, PgRow<'c>> for Repeat {
-    fn from_row(row: &PgRow<'c>) -> sqlx::Result<Self> {
-        let every = row.try_get("every")?;
-        if every <= 0 {
-            return Err(sqlx::Error::Decode(Box::new(WrongRepetitionFrequency {})));
-        }
-        let day: PgWeekDay = row.try_get("week_day")?;
-        let time = row.try_get("scheduled_time")?;
-        let start_day = row.try_get("start_day")?;
-        let end_day = row.try_get("end_day")?;
-
-        Ok(Repeat {
-            every,
-            day: day.into(),
-            time,
-            start_day,
-            end_day,
-        })
-    }
 }
 
 impl Repeat {
@@ -138,13 +75,12 @@ impl Repeat {
 
             for Repeat {
                 every,
-                day,
+                week_day,
                 time,
                 start_day,
                 end_day,
             } in repeats
             {
-                let week_day: PgWeekDay = day.clone().into();
                 query = query
                     .bind(every)
                     .bind(week_day)
@@ -178,4 +114,22 @@ impl Repeat {
             .await
             .map(|_| ())
     }
+
+    // pub async fn lesson_ids_at_date_in_transaction(
+    //     transaction: &mut Transaction,
+    //     date: NaiveDate,
+    //     account_id: AccountID,
+    // ) -> sqlx::Result<Vec<LessonID>> {
+    //     sqlx::query_as::<_, (LessonID,)>(indoc! {"
+    //         SELECT DISTINCT lesson_id FROM Repeats 
+    //         WHERE 
+    //             repeats_on_date(start_day, end_day, week_day, every, $1) AND 
+    //             lesson_permission_for(lesson_id, $2) = 'r'::PermissionType
+    //     "})
+    //     .bind(date)
+    //     .bind(account_id)
+    //     .fetch_all(transaction)
+    //     .await
+    //     .map(|vec| vec.into_iter().map(|(lesson_id,)| lesson_id).collect())
+    // }
 }

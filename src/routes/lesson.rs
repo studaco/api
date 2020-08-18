@@ -2,6 +2,7 @@ use actix_web::{delete, get, patch, put, web, HttpResponse};
 use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
 use std::vec::Vec;
+use chrono::NaiveDate;
 
 use crate::error::{APIError, Result};
 use crate::middleware::{Authentication, CheckLessonPermission, ExtractLessonID};
@@ -118,9 +119,25 @@ pub async fn delete_lesson(
     Ok(HttpResponse::NoContent().finish())
 }
 
+#[derive(Deserialize)]
+pub struct GetLessonsQuery {
+    date: NaiveDate
+}
+
+#[get("/lessons", wrap = "Authentication")]
+pub async fn get_lessons(
+    db: web::Data<PgPool>,
+    date: web::Query<GetLessonsQuery>,
+    account_id: AccountID
+) -> Result<Vec<LessonID>> {
+    let GetLessonsQuery { date } = date.into_inner();
+    Ok(Lesson::for_date(db.get_ref(), &date, &account_id).await?.into())
+}
+
 pub fn configure_lesson_routes(cfg: &mut web::ServiceConfig) {
     cfg.service(get_lesson)
         .service(put_lesson)
         .service(patch_lesson)
-        .service(delete_lesson);
+        .service(delete_lesson)
+        .service(get_lessons);
 }

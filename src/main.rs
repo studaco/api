@@ -4,6 +4,7 @@ use dotenv::dotenv;
 use include_dir::{include_dir, Dir};
 use listenfd::ListenFd;
 use sqlx::postgres::PgPool;
+use sqlx::postgres::PgQueryAs;
 use sqlx_pg_migrate::migrate;
 use std::env;
 use env_logger;
