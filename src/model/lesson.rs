@@ -8,6 +8,7 @@ use uuid::Uuid;
 use chrono::NaiveDate;
 use indoc::indoc;
 
+use super::Transaction;
 use super::permission::{LessonPermission, PermissionType};
 use super::repeat::Repeat;
 use super::account::AccountID;
@@ -53,7 +54,7 @@ struct LessonBase {
 }
 
 impl Lesson {
-    pub async fn of_user(db: &PgPool, lesson_id: LessonID) -> sqlx::Result<Option<Lesson>> {
+    pub async fn by_id(db: &PgPool, lesson_id: LessonID) -> sqlx::Result<Option<Lesson>> {
         let mut transaction = db.begin().await?;
 
         let base = sqlx::query_as("SELECT title, description FROM Lesson WHERE id = $1")
@@ -76,6 +77,31 @@ impl Lesson {
                 };
 
                 transaction.commit().await?;
+                Some(res)
+            }
+        })
+    }
+
+    pub async fn by_id_in_transaction(transaction: &mut Transaction, lesson_id: LessonID) -> sqlx::Result<Option<Lesson>> {
+        let base = sqlx::query_as("SELECT title, description FROM Lesson WHERE id = $1")
+            .bind(&lesson_id)
+            .fetch_optional(transaction)
+            .await?;
+
+        Ok(match base {
+            None => None,
+            Some(LessonBase { description, title }) => {
+                let repeats = Repeat::of_lesson_in_transaction(transaction, &lesson_id).await?;
+                let singles = SingleOccurance::of_lesson_in_transaction(transaction, &lesson_id).await?;
+
+                let res = Lesson {
+                    id: lesson_id,
+                    title,
+                    description,
+                    repeats,
+                    singles,
+                };
+
                 Some(res)
             }
         })
@@ -171,7 +197,9 @@ impl Lesson {
     }
 
     pub async fn for_date(db: &PgPool, date: &NaiveDate, account_id: &AccountID) -> sqlx::Result<Vec<LessonID>> {
-        sqlx::query_as::<_, (LessonID,)>(indoc! {"
+        let transaction = db.begin().await?;
+
+        let ids = sqlx::query_as::<_, (LessonID,)>(indoc! {"
             SELECT x.lesson_id FROM (
                 SELECT DISTINCT lesson_id FROM Repeats 
                 WHERE repeats_on_date(start_day, end_day, week_day, every, $1)
@@ -183,8 +211,18 @@ impl Lesson {
         "})
         .bind(date)
         .bind(account_id)
-        .fetch_all(db)
-        .await
-        .map(|vec| vec.into_iter().map(|(lesson_id,)| lesson_id).collect())
+        .fetch_all(&mut transaction)
+        .await?;
+
+        let res = Vec::<Lesson>::with_capacity(ids.len());
+        for (lesson_id,) in ids {
+            if let Some(lesson) = Lesson::by_id_in_transaction(&mut transaction, lesson_id).await? {
+                res.push(lesson);
+            }
+        }
+
+        transaction.commit().await?;
+
+        Ok(res)
     }
 }

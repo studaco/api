@@ -23,7 +23,7 @@ use crate::util::deserialize_optional_field;
     wrap = "Authentication"
 )]
 pub async fn get_lesson(db: web::Data<PgPool>, lesson_id: LessonID) -> Result<Lesson> {
-    Lesson::of_user(db.get_ref(), lesson_id)
+    Lesson::by_id(db.get_ref(), lesson_id)
         .await?
         .ok_or(APIError::LessonDosNotExist)
         .map(Payload::from)
@@ -129,7 +129,7 @@ pub async fn get_lessons(
     db: web::Data<PgPool>,
     date: web::Query<GetLessonsQuery>,
     account_id: AccountID
-) -> Result<Vec<LessonID>> {
+) -> Result<Vec<Lesson>> {
     let GetLessonsQuery { date } = date.into_inner();
     Ok(Lesson::for_date(db.get_ref(), &date, &account_id).await?.into())
 }
