@@ -1,17 +1,16 @@
 use actix_http::Payload;
 use actix_web::{FromRequest, HttpRequest};
+use chrono::NaiveDate;
 use futures::future::{ready, Ready};
-use serde::{Serialize, Deserialize};
-use sqlx::postgres::{ PgPool, PgQueryAs, Postgres};
+use indoc::indoc;
+use serde::{Deserialize, Serialize};
+use sqlx::postgres::{PgPool, PgQueryAs, Postgres};
 use std::vec::Vec;
 use uuid::Uuid;
-use chrono::NaiveDate;
-use indoc::indoc;
 
-use super::Transaction;
+use super::account::AccountID;
 use super::permission::{LessonPermission, PermissionType};
 use super::repeat::Repeat;
-use super::account::AccountID;
 use super::single_occurance::SingleOccurance;
 use crate::error::APIError;
 
@@ -30,8 +29,7 @@ impl FromRequest for LessonID {
                 .get::<LessonID>()
                 .map(|id| id.clone())
                 .ok_or(APIError::InternalError {
-                    message: "Error encountered while extracting parameters"
-                        .to_string(),
+                    message: "Error encountered while extracting parameters".to_string(),
                 }),
         )
     }
@@ -44,7 +42,7 @@ pub struct Lesson {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
     pub repeats: Vec<Repeat>,
-    pub singles: Vec<SingleOccurance>
+    pub singles: Vec<SingleOccurance>,
 }
 
 #[derive(sqlx::FromRow)]
@@ -65,8 +63,10 @@ impl Lesson {
         Ok(match base {
             None => None,
             Some(LessonBase { description, title }) => {
-                let repeats = Repeat::of_lesson_in_transaction(&mut transaction, &lesson_id).await?;
-                let singles = SingleOccurance::of_lesson_in_transaction(&mut transaction, &lesson_id).await?;
+                let repeats =
+                    Repeat::of_lesson_in_transaction(&mut transaction, &lesson_id).await?;
+                let singles =
+                    SingleOccurance::of_lesson_in_transaction(&mut transaction, &lesson_id).await?;
 
                 let res = Lesson {
                     id: lesson_id,
@@ -77,31 +77,6 @@ impl Lesson {
                 };
 
                 transaction.commit().await?;
-                Some(res)
-            }
-        })
-    }
-
-    pub async fn by_id_in_transaction(transaction: &mut Transaction, lesson_id: LessonID) -> sqlx::Result<Option<Lesson>> {
-        let base = sqlx::query_as("SELECT title, description FROM Lesson WHERE id = $1")
-            .bind(&lesson_id)
-            .fetch_optional(transaction)
-            .await?;
-
-        Ok(match base {
-            None => None,
-            Some(LessonBase { description, title }) => {
-                let repeats = Repeat::of_lesson_in_transaction(transaction, &lesson_id).await?;
-                let singles = SingleOccurance::of_lesson_in_transaction(transaction, &lesson_id).await?;
-
-                let res = Lesson {
-                    id: lesson_id,
-                    title,
-                    description,
-                    repeats,
-                    singles,
-                };
-
                 Some(res)
             }
         })
@@ -196,8 +171,12 @@ impl Lesson {
             .map(|_| ())
     }
 
-    pub async fn for_date(db: &PgPool, date: &NaiveDate, account_id: &AccountID) -> sqlx::Result<Vec<LessonID>> {
-        let transaction = db.begin().await?;
+    pub async fn for_date(
+        db: &PgPool,
+        date: &NaiveDate,
+        account_id: &AccountID,
+    ) -> sqlx::Result<Vec<Lesson>> {
+        let mut transaction = db.begin().await?;
 
         let ids = sqlx::query_as::<_, (LessonID,)>(indoc! {"
             SELECT x.lesson_id FROM (
@@ -214,9 +193,33 @@ impl Lesson {
         .fetch_all(&mut transaction)
         .await?;
 
-        let res = Vec::<Lesson>::with_capacity(ids.len());
+        let mut res = Vec::<Lesson>::with_capacity(ids.len());
         for (lesson_id,) in ids {
-            if let Some(lesson) = Lesson::by_id_in_transaction(&mut transaction, lesson_id).await? {
+            let base = sqlx::query_as("SELECT title, description FROM Lesson WHERE id = $1")
+                .bind(&lesson_id)
+                .fetch_optional(&mut transaction)
+                .await?;
+
+            let lesson = match base {
+                None => None,
+                Some(LessonBase { description, title }) => {
+                    let repeats = Repeat::of_lesson_in_transaction(&mut transaction, &lesson_id).await?;
+                    let singles =
+                        SingleOccurance::of_lesson_in_transaction(&mut transaction, &lesson_id).await?;
+
+                    let res = Lesson {
+                        id: lesson_id,
+                        title,
+                        description,
+                        repeats,
+                        singles,
+                    };
+
+                    Some(res)
+                }
+            };
+
+            if let Some(lesson) = lesson {
                 res.push(lesson);
             }
         }

@@ -22,8 +22,10 @@ pub enum WeekDay {
 #[derive(Serialize, Deserialize, Debug, Copy, Clone, sqlx::FromRow)]
 pub struct Repeat {
     every: i32,
+    #[serde(rename = "day")]
     week_day: WeekDay,
-    time: NaiveTime,
+    #[serde(rename = "time")]
+    scheduled_time: NaiveTime,
     start_day: NaiveDate,
     end_day: Option<NaiveDate>,
 }
@@ -70,7 +72,7 @@ impl Repeat {
             for Repeat {
                 every,
                 week_day,
-                time,
+                scheduled_time,
                 start_day,
                 end_day,
             } in repeats
@@ -78,7 +80,7 @@ impl Repeat {
                 query = query
                     .bind(every)
                     .bind(week_day)
-                    .bind(time)
+                    .bind(scheduled_time)
                     .bind(lesson_id)
                     .bind(start_day)
                     .bind(end_day);
