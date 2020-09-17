@@ -1,6 +1,7 @@
 use actix_http::Payload;
 use actix_web::{FromRequest, HttpRequest};
 use futures::future::{ready, Ready};
+use indoc::indoc;
 use serde::{Deserialize, Serialize};
 use sqlx::postgres::{PgPool, PgQueryAs};
 use uuid::Uuid;
@@ -112,7 +113,11 @@ impl Teacher {
             return Ok(());
         }
 
-        let sql = format!("UPDATE Teacher SET {} WHERE id = ${}", parts.join(","), counter + 1);
+        let sql = format!(
+            "UPDATE Teacher SET {} WHERE id = ${}",
+            parts.join(","),
+            counter + 1
+        );
         let mut query = sqlx::query(&sql[..]);
 
         if let Some(first_name) = first_name {
@@ -136,5 +141,17 @@ impl Teacher {
             .execute(db)
             .await
             .map(|_| ())
+    }
+
+    pub async fn of_user(db: &PgPool, account_id: &AccountID) -> sqlx::Result<Vec<Teacher>> {
+        sqlx::query_as(indoc! {"
+            SELECT id, first_name, last_name, Teacher.account_id
+            FROM Teacher
+            JOIN TeacherPermission ON Teacher.id = TeacherPermission.teacher_id
+            WHERE TeacherPermission.account_id = $1
+        "})
+        .bind(account_id)
+        .fetch_all(db)
+        .await
     }
 }

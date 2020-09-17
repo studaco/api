@@ -97,15 +97,15 @@ pub async fn delete_teacher(
     Ok(HttpResponse::NoContent().finish())
 }
 
-// #[get("/teachers", wrap = "Authentication")]
-// pub async fn get_teachers(db: web::Data<PgPool>, account_id: AccountID) -> Result<Vec<Teacher>> {
-//     Teacher::of_user(db.get_ref(), &account_id).await.into()
-// }
+#[get("/teachers", wrap = "Authentication")]
+pub async fn get_teachers(db: web::Data<PgPool>, account_id: AccountID) -> Result<Vec<Teacher>> {
+    Ok(Teacher::of_user(db.get_ref(), &account_id).await?.into())
+}
 
 pub fn configure_teacher_routes(cfg: &mut web::ServiceConfig) {
     cfg.service(get_teacher)
         .service(put_teacher)
         .service(patch_teacher)
-        .service(delete_teacher);
-        // .service(get_teachers);
+        .service(delete_teacher)
+        .service(get_teachers);
 }
