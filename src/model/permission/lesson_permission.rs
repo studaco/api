@@ -6,45 +6,16 @@ use sqlx::{
     postgres::{PgPool, PgQueryAs, PgRow},
     Row,
 };
-use thiserror::Error;
 
-use super::account::AccountID;
-use super::lesson::LessonID;
-use super::Transaction;
 use crate::error::APIError;
-
-#[derive(Debug, sqlx::Type)]
-#[sqlx(rename = "permissiontype", rename_all = "lowercase")]
-enum PgPermissionType {
-    R,
-    RW,
-}
-
-impl From<PermissionType> for PgPermissionType {
-    fn from(pt: PermissionType) -> Self {
-        match pt {
-            PermissionType::Read => PgPermissionType::R,
-            PermissionType::ReadWrite => PgPermissionType::RW,
-        }
-    }
-}
-
-#[derive(Debug, Deserialize, Serialize, Copy, Clone, Eq, PartialEq)]
-pub enum PermissionType {
-    #[serde(rename = "r")]
-    Read,
-    #[serde(rename = "rw")]
-    ReadWrite,
-}
-
-impl From<PgPermissionType> for PermissionType {
-    fn from(pt: PgPermissionType) -> Self {
-        match pt {
-            PgPermissionType::R => PermissionType::Read,
-            PgPermissionType::RW => PermissionType::ReadWrite,
-        }
-    }
-}
+use crate::model::{
+    account::AccountID,
+    lesson::LessonID,
+    permission::{
+        PermissionError, PermissionType, PgPermissionType, Result,
+    },
+    Transaction,
+};
 
 #[derive(Debug, Serialize, Deserialize, Copy, Clone)]
 pub struct LessonPermission {
@@ -64,17 +35,11 @@ impl FromRequest for LessonPermission {
                 .get::<LessonPermission>()
                 .map(|id| id.clone())
                 .ok_or(APIError::InternalError {
-                    message: "Error encountered while processing permission checks"
-                        .to_string(),
+                    message: "Error encountered while processing permission checks".to_string(),
                 }),
         )
     }
 }
-
-
-#[derive(Debug, Error)]
-#[error("Invalid Permission Type. Should be either \"r\" or \"rw\"")]
-struct InvalidPermissionType {}
 
 // How to make this one generic over database types?
 impl<'c> sqlx::FromRow<'c, PgRow<'c>> for LessonPermission {
@@ -90,28 +55,6 @@ impl<'c> sqlx::FromRow<'c, PgRow<'c>> for LessonPermission {
         })
     }
 }
-
-#[derive(Error, Debug)]
-pub enum PermissionError {
-    #[error("Entity not present")]
-    LessonNotPresent,
-    #[error("Permission not present")]
-    PermissionNotPresent,
-    #[error("sqlx error occurred while fetching permission ({0})")]
-    Sqlx(#[from] sqlx::Error),
-}
-
-impl From<PermissionError> for APIError {
-    fn from(error: PermissionError) -> APIError {
-        match error {
-            PermissionError::LessonNotPresent => APIError::LessonDosNotExist,
-            PermissionError::PermissionNotPresent => APIError::NoReadAccess,
-            PermissionError::Sqlx(error) => error.into(),
-        }
-    }
-}
-
-type Result<T> = std::result::Result<T, PermissionError>;
 
 impl LessonPermission {
     pub async fn of_entity(
@@ -141,7 +84,7 @@ impl LessonPermission {
                 .await?;
 
         if !entity_exists {
-            return Err(PermissionError::LessonNotPresent);
+            return Err(PermissionError::EntityNotPresent);
         }
 
         let res: Option<(PgPermissionType,)> = sqlx::query_as(
@@ -156,7 +99,7 @@ impl LessonPermission {
             .map(|(permission_type,)| permission_type.into())
     }
 
-    pub(crate) async fn save_in_transaction(
+    pub async fn save_in_transaction(
         transaction: &mut Transaction,
         permission_type: PermissionType,
         lesson_id: &LessonID,

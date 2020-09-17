@@ -4,4 +4,4 @@ pub mod extractors;
 
 pub use authentication::Authentication;
 pub use lesson_permission::CheckLessonPermission;
-pub use extractors::ExtractLessonID;
+pub use extractors::PathExtractor;

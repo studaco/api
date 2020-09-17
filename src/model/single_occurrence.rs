@@ -21,7 +21,7 @@ impl SingleOccurrence {
         .bind(lesson_id)
         .fetch_all(transaction)
         .await
-        .map(|vec| vec.into_iter().map(|(occurrence,)| occurrence).collect())
+        .map(|vec| vec.into_iter().map(|(occurance,)| occurance).collect())
     }
 
     pub async fn insert_in_transaction(
@@ -42,8 +42,8 @@ impl SingleOccurrence {
 
             let mut query = sqlx::query(&sql[..]);
 
-            for SingleOccurrence(occurrence) in singles {
-                query = query.bind(occurrence).bind(lesson_id);
+            for SingleOccurrence(occurance) in singles {
+                query = query.bind(occurance).bind(lesson_id);
             }
             query.execute(transaction).await?;
         }

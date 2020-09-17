@@ -5,7 +5,7 @@ use std::vec::Vec;
 use chrono::NaiveDate;
 
 use crate::error::{APIError, Result};
-use crate::middleware::{Authentication, CheckLessonPermission, ExtractLessonID};
+use crate::middleware::{Authentication, CheckLessonPermission, PathExtractor};
 use crate::model::{
     account::AccountID,
     lesson::{Lesson, LessonID},
@@ -19,7 +19,7 @@ use crate::util::deserialize_optional_field;
 #[get(
     "/lesson/{id}",
     wrap = "CheckLessonPermission::new(PermissionType::Read)",
-    wrap = "ExtractLessonID",
+    wrap = "PathExtractor::<LessonID>::new()",
     wrap = "Authentication"
 )]
 pub async fn get_lesson(db: web::Data<PgPool>, lesson_id: LessonID) -> Result<Lesson> {
@@ -78,7 +78,7 @@ pub struct LessonUpdateRequest {
 #[patch(
     "/lesson/{id}",
     wrap = "CheckLessonPermission::new(PermissionType::ReadWrite)",
-    wrap = "ExtractLessonID",
+    wrap = "PathExtractor::<LessonID>::new()",
     wrap = "Authentication"
 )]
 pub async fn patch_lesson(
@@ -108,7 +108,7 @@ pub async fn patch_lesson(
 #[delete(
     "/lesson/{id}",
     wrap = "CheckLessonPermission::new(PermissionType::ReadWrite)",
-    wrap = "ExtractLessonID",
+    wrap = "PathExtractor::<LessonID>::new()",
     wrap = "Authentication"
 )]
 pub async fn delete_lesson(
