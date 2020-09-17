@@ -11,7 +11,7 @@ use crate::model::{
     lesson::{Lesson, LessonID},
     permission::PermissionType,
     repeat::Repeat,
-    single_occurance::SingleOccurance,
+    single_occurrence::SingleOccurrence,
 };
 use crate::payload::Payload;
 use crate::util::deserialize_optional_field;
@@ -34,7 +34,7 @@ pub struct LessonCreateRequest {
     title: String,
     description: Option<String>,
     repeats: Option<Vec<Repeat>>,
-    singles: Option<Vec<SingleOccurance>>,
+    singles: Option<Vec<SingleOccurrence>>,
 }
 
 #[put("/lesson", wrap = "Authentication")]
@@ -72,7 +72,7 @@ pub struct LessonUpdateRequest {
     #[serde(skip_serializing_if = "Option::is_none")]
     repeats: Option<Vec<Repeat>>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    singles: Option<Vec<SingleOccurance>>,
+    singles: Option<Vec<SingleOccurrence>>,
 }
 
 #[patch(

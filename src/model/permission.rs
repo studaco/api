@@ -97,7 +97,7 @@ pub enum PermissionError {
     LessonNotPresent,
     #[error("Permission not present")]
     PermissionNotPresent,
-    #[error("sqlx error occured while fetching permission ({0})")]
+    #[error("sqlx error occurred while fetching permission ({0})")]
     Sqlx(#[from] sqlx::Error),
 }
 

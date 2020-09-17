@@ -8,25 +8,25 @@ use super::Transaction;
 
 #[derive(Serialize, Deserialize, Debug, Copy, Clone, Ord, PartialOrd, Eq, PartialEq, sqlx::Type)]
 #[sqlx(transparent)]
-pub struct SingleOccurance(NaiveDateTime);
+pub struct SingleOccurrence(NaiveDateTime);
 
-impl SingleOccurance {
+impl SingleOccurrence {
     pub async fn of_lesson_in_transaction(
         transaction: &mut Transaction,
         lesson_id: &LessonID,
-    ) -> sqlx::Result<Vec<SingleOccurance>> {
-        sqlx::query_as::<_, (SingleOccurance,)>(
+    ) -> sqlx::Result<Vec<SingleOccurrence>> {
+        sqlx::query_as::<_, (SingleOccurrence,)>(
             "SELECT occures_at FROM SingleOccurance WHERE lesson_id = $1",
         )
         .bind(lesson_id)
         .fetch_all(transaction)
         .await
-        .map(|vec| vec.into_iter().map(|(occurance,)| occurance).collect())
+        .map(|vec| vec.into_iter().map(|(occurrence,)| occurrence).collect())
     }
 
     pub async fn insert_in_transaction(
         transaction: &mut Transaction,
-        singles: &Vec<SingleOccurance>,
+        singles: &Vec<SingleOccurrence>,
         lesson_id: &LessonID,
     ) -> sqlx::Result<()> {
         if !singles.is_empty() {
@@ -42,8 +42,8 @@ impl SingleOccurance {
 
             let mut query = sqlx::query(&sql[..]);
 
-            for SingleOccurance(occurance) in singles {
-                query = query.bind(occurance).bind(lesson_id);
+            for SingleOccurrence(occurrence) in singles {
+                query = query.bind(occurrence).bind(lesson_id);
             }
             query.execute(transaction).await?;
         }
@@ -53,11 +53,11 @@ impl SingleOccurance {
 
     pub async fn update_in_transaction(
         transaction: &mut Transaction,
-        singles: &Vec<SingleOccurance>,
+        singles: &Vec<SingleOccurrence>,
         lesson_id: &LessonID,
     ) -> sqlx::Result<()> {
-        SingleOccurance::delete_in_transaction(transaction, lesson_id).await?;
-        SingleOccurance::insert_in_transaction(transaction, singles, lesson_id).await
+        SingleOccurrence::delete_in_transaction(transaction, lesson_id).await?;
+        SingleOccurrence::insert_in_transaction(transaction, singles, lesson_id).await
     }
 
     pub async fn delete_in_transaction(

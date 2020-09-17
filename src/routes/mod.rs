@@ -1,5 +1,6 @@
 pub mod auth;
 pub mod lesson;
+pub mod teacher;
 
 use actix_web::web;
 use actix_web::{get};
