@@ -16,12 +16,12 @@ impl SingleOccurrence {
         lesson_id: &LessonID,
     ) -> sqlx::Result<Vec<SingleOccurrence>> {
         sqlx::query_as::<_, (SingleOccurrence,)>(
-            "SELECT occures_at FROM SingleOccurance WHERE lesson_id = $1",
+            "SELECT occurs_at FROM SingleOccurrence WHERE lesson_id = $1",
         )
         .bind(lesson_id)
         .fetch_all(transaction)
         .await
-        .map(|vec| vec.into_iter().map(|(occurance,)| occurance).collect())
+        .map(|vec| vec.into_iter().map(|(occurrence,)| occurrence).collect())
     }
 
     pub async fn insert_in_transaction(
@@ -36,14 +36,14 @@ impl SingleOccurrence {
                 .join(",");
 
             let sql = format!(
-                "INSERT INTO SingleOccurance (occures_at, lesson_id) VALUES {}",
+                "INSERT INTO SingleOccurrence (occurs_at, lesson_id) VALUES {}",
                 values
             );
 
             let mut query = sqlx::query(&sql[..]);
 
-            for SingleOccurrence(occurance) in singles {
-                query = query.bind(occurance).bind(lesson_id);
+            for SingleOccurrence(occurrence) in singles {
+                query = query.bind(occurrence).bind(lesson_id);
             }
             query.execute(transaction).await?;
         }
@@ -64,7 +64,7 @@ impl SingleOccurrence {
         transaction: &mut Transaction,
         lesson_id: &LessonID,
     ) -> sqlx::Result<()> {
-        sqlx::query("DELETE FROM SingleOccurance WHERE lesson_id = $1")
+        sqlx::query("DELETE FROM SingleOccurrence WHERE lesson_id = $1")
             .bind(lesson_id)
             .execute(transaction)
             .await

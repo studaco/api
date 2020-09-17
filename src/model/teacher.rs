@@ -1,11 +1,8 @@
 use actix_http::Payload;
 use actix_web::{FromRequest, HttpRequest};
-use chrono::NaiveDate;
 use futures::future::{ready, Ready};
-use indoc::indoc;
 use serde::{Deserialize, Serialize};
-use sqlx::postgres::{PgPool, PgQueryAs, Postgres};
-use std::vec::Vec;
+use sqlx::postgres::{PgPool, PgQueryAs};
 use uuid::Uuid;
 
 use super::account::AccountID;
@@ -38,12 +35,13 @@ pub struct Teacher {
     id: TeacherID,
     first_name: String,
     last_name: Option<String>,
-    user_id: Option<AccountID>,
+    #[sqlx(rename = "account_id")]
+    associated_account_id: Option<AccountID>,
 }
 
 impl Teacher {
-    pub async fn by_id(db: &PgPool, teacher_id: &TeacherID) -> sqlx::Result<Option<Teacher>> {
-        sqlx::query_as("SELECT id, first_name, last_name, user_id FROM Teacher WHERE id = $1")
+    pub async fn by_id(db: &PgPool, teacher_id: TeacherID) -> sqlx::Result<Option<Teacher>> {
+        sqlx::query_as("SELECT id, first_name, last_name, account_id FROM Teacher WHERE id = $1")
             .bind(teacher_id)
             .fetch_optional(db)
             .await
@@ -53,17 +51,17 @@ impl Teacher {
         db: &PgPool,
         first_name: String,
         last_name: Option<String>,
-        user_id: Option<AccountID>,
-        owner: AccountID,
+        associated_account_id: Option<AccountID>,
+        owner: &AccountID,
     ) -> sqlx::Result<Teacher> {
         let mut transaction = db.begin().await?;
 
         let (id,): (TeacherID,) = sqlx::query_as(
-            "INSERT INTO Teacher (first_name, last_name, user_id) VALUES ($1, $2, $3) RETURNING id",
+            "INSERT INTO Teacher (first_name, last_name, account_id) VALUES ($1, $2, $3) RETURNING id",
         )
         .bind(&first_name)
         .bind(&last_name)
-        .bind(&user_id)
+        .bind(&associated_account_id)
         .fetch_one(&mut transaction)
         .await?;
 
@@ -71,41 +69,50 @@ impl Teacher {
             &mut transaction,
             PermissionType::ReadWrite,
             &id,
-            &owner,
+            owner,
         )
         .await?;
+
+        transaction.commit().await?;
 
         Ok(Teacher {
             id,
             first_name,
             last_name,
-            user_id,
+            associated_account_id,
         })
     }
 
     pub async fn update(
         db: &PgPool,
+        teacher_id: &TeacherID,
         first_name: Option<String>,
         last_name: Option<Option<String>>,
-        user_id: Option<Option<AccountID>>,
+        associated_account_id: Option<Option<AccountID>>,
     ) -> sqlx::Result<()> {
-        if let (None, None, None) = (&first_name, &last_name, &user_id) {
-            return Ok(());
-        };
-        let mut sql = "UPDATE Teacher SET ".to_string();
+        let mut parts = Vec::<String>::with_capacity(3);
+        let mut counter = 0_u8;
 
         if first_name.is_some() {
-            sql.push_str("first_name = $1")
+            counter += 1;
+            parts.push(format!("first_name = ${}", counter));
         }
 
         if last_name.is_some() {
-            sql.push_str("last_name = $2");
+            counter += 1;
+            parts.push(format!("last_name = ${}", counter));
         }
 
-        if user_id.is_some() {
-            sql.push_str("user_id = $3");
+        if associated_account_id.is_some() {
+            counter += 1;
+            parts.push(format!("account_id = ${}", counter));
         }
 
+        if counter == 0 {
+            return Ok(());
+        }
+
+        let sql = format!("UPDATE Teacher SET {} WHERE id = ${}", parts.join(","), counter + 1);
         let mut query = sqlx::query(&sql[..]);
 
         if let Some(first_name) = first_name {
@@ -116,11 +123,11 @@ impl Teacher {
             query = query.bind(last_name);
         }
 
-        if let Some(user_id) = user_id {
+        if let Some(user_id) = associated_account_id {
             query = query.bind(user_id);
         }
 
-        query.execute(db).await.map(|_| ())
+        query.bind(teacher_id).execute(db).await.map(|_| ())
     }
 
     pub async fn delete(db: &PgPool, teacher_id: &TeacherID) -> sqlx::Result<()> {

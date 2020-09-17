@@ -49,6 +49,7 @@ pub async fn put_lesson(
         repeats,
         singles,
     } = lesson.into_inner();
+
     Ok(Lesson::create(
         db.get_ref(),
         title,

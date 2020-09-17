@@ -50,7 +50,7 @@ pub enum PermissionError {
 impl From<PermissionError> for APIError {
     fn from(error: PermissionError) -> APIError {
         match error {
-            PermissionError::EntityNotPresent => APIError::LessonDosNotExist,
+            PermissionError::EntityNotPresent => APIError::LessonDosNotExist, // TODO: Store entity type in the EntityNotPresent
             PermissionError::PermissionNotPresent => APIError::NoReadAccess,
             PermissionError::Sqlx(error) => error.into(),
         }
@@ -58,7 +58,3 @@ impl From<PermissionError> for APIError {
 }
 
 pub type Result<T> = std::result::Result<T, PermissionError>;
-
-#[derive(Debug, Error)]
-#[error("Invalid Permission Type. Should be either \"r\" or \"rw\"")]
-pub struct InvalidPermissionType {}

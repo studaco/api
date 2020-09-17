@@ -183,8 +183,8 @@ impl Lesson {
                 SELECT DISTINCT lesson_id FROM Repeats 
                 WHERE repeats_on_date(start_day, end_day, week_day, every, $1)
                 UNION
-                SELECT DISTINCT lesson_id FROM SingleOccurance 
-                WHERE occures_at BETWEEN $1 AND $1 + 1
+                SELECT DISTINCT lesson_id FROM SingleOccurrence 
+                WHERE occurs_at BETWEEN $1 AND $1 + 1
             ) x
             WHERE is_read_permission(lesson_permission_for(x.lesson_id, $2))
         "})
