@@ -12,7 +12,7 @@ use std::rc::Rc;
 use crate::error::APIError;
 use crate::model::account::AccountID;
 use crate::model::teacher::TeacherID;
-use crate::model::permission::{TeacherPermission, PermissionType};
+use crate::model::permission::{TeacherPermission, PermissionType, EntityPermission};
 
 #[derive(Debug, Copy, Clone)]
 pub struct CheckTeacherPermission {

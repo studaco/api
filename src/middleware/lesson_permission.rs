@@ -12,7 +12,7 @@ use std::rc::Rc;
 use crate::error::APIError;
 use crate::model::account::AccountID;
 use crate::model::lesson::LessonID;
-use crate::model::permission::{LessonPermission, PermissionType};
+use crate::model::permission::{LessonPermission, PermissionType, EntityPermission};
 
 #[derive(Debug, Copy, Clone)]
 pub struct CheckLessonPermission {

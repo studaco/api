@@ -9,7 +9,7 @@ use std::vec::Vec;
 use uuid::Uuid;
 
 use super::account::AccountID;
-use super::permission::{LessonPermission, PermissionType};
+use super::permission::{LessonPermission, PermissionType, EntityPermission};
 use super::repeat::Repeat;
 use super::single_occurrence::SingleOccurrence;
 use crate::error::APIError;

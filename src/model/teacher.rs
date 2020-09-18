@@ -7,7 +7,7 @@ use sqlx::postgres::{PgPool, PgQueryAs};
 use uuid::Uuid;
 
 use super::account::AccountID;
-use super::permission::{PermissionType, TeacherPermission};
+use super::permission::{PermissionType, TeacherPermission, EntityPermission};
 use crate::error::APIError;
 
 #[derive(Debug, Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Serialize, Deserialize, sqlx::Type)]

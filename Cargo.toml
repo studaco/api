@@ -14,7 +14,7 @@ actix-web = "2.0"
 anyhow = "1.0"
 bcrypt = "0.8"
 chrono = {version = "0.4", features = ["serde"]}
-dotenv = "0.6"
+dotenv = "0.15"
 env_logger = "0.7"
 futures = "0.3"
 hmac = "0.8"
@@ -33,3 +33,4 @@ sqlx-core = "0.3.5"
 sqlx-pg-migrate = "1.0"
 thiserror = "1.0"
 uuid = {version = "0.8", features = ["serde"]}
+async-trait = "0.1"
