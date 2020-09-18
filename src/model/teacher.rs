@@ -35,8 +35,10 @@ impl FromRequest for TeacherID {
 pub struct Teacher {
     id: TeacherID,
     first_name: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
     last_name: Option<String>,
     #[sqlx(rename = "account_id")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     associated_account_id: Option<AccountID>,
 }
 
