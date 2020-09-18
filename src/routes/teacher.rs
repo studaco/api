@@ -3,10 +3,10 @@ use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
 
 use crate::error::{APIError, Result};
-use crate::middleware::{Authentication, CheckTeacherPermission, PathExtractor};
+use crate::middleware::{Authentication, CheckPermission, PathExtractor};
 use crate::model::{
     account::AccountID,
-    permission::PermissionType,
+    permission::{PermissionType, TeacherPermission},
     teacher::{Teacher, TeacherID},
 };
 use crate::payload::Payload;
@@ -14,7 +14,7 @@ use crate::util::deserialize_optional_field;
 
 #[get(
     "/teacher/{id}",
-    wrap = "CheckTeacherPermission::new(PermissionType::Read)",
+    wrap = "CheckPermission::<TeacherPermission>::new(PermissionType::Read)",
     wrap = "PathExtractor::<TeacherID>::new()",
     wrap = "Authentication"
 )]
@@ -65,7 +65,7 @@ pub struct TeacherUpdateRequest {
 
 #[patch(
     "/teacher/{id}",
-    wrap = "CheckTeacherPermission::new(PermissionType::ReadWrite)",
+    wrap = "CheckPermission::<TeacherPermission>::new(PermissionType::ReadWrite)",
     wrap = "PathExtractor::<TeacherID>::new()",
     wrap = "Authentication"
 )]
@@ -85,7 +85,7 @@ pub async fn patch_teacher(
 
 #[delete(
     "/teacher/{id}",
-    wrap = "CheckTeacherPermission::new(PermissionType::ReadWrite)",
+    wrap = "CheckPermission::<TeacherPermission>::new(PermissionType::ReadWrite)",
     wrap = "PathExtractor::<TeacherID>::new()",
     wrap = "Authentication"
 )]

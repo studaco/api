@@ -7,36 +7,46 @@ use futures::future::{ok, Ready};
 use futures::Future;
 use sqlx::PgPool;
 use std::cell::RefCell;
+use std::marker::PhantomData;
 use std::rc::Rc;
 
 use crate::error::APIError;
 use crate::model::account::AccountID;
-use crate::model::lesson::LessonID;
-use crate::model::permission::{LessonPermission, PermissionType, EntityPermission};
+use crate::model::permission::{EntityPermission, PermissionType};
 
 #[derive(Debug, Copy, Clone)]
-pub struct CheckLessonPermission {
+pub struct CheckPermission<T> {
     permission_type: Option<PermissionType>,
+    marker: PhantomData<T>,
 }
 
-impl Default for CheckLessonPermission {
-    fn default() -> CheckLessonPermission {
-        CheckLessonPermission {
-            permission_type: None,
-        }
-    }
-}
-
-impl CheckLessonPermission {
-    pub fn new(permission_type: PermissionType) -> CheckLessonPermission {
-        CheckLessonPermission {
-            permission_type: Some(permission_type),
-        }
-    }
-}
-
-impl<S, B> Transform<S> for CheckLessonPermission
+impl<T> Default for CheckPermission<T>
 where
+    T: EntityPermission,
+{
+    fn default() -> CheckPermission<T> {
+        CheckPermission {
+            permission_type: None,
+            marker: PhantomData,
+        }
+    }
+}
+
+impl<T> CheckPermission<T>
+where
+    T: EntityPermission,
+{
+    pub fn new(permission_type: PermissionType) -> CheckPermission<T> {
+        CheckPermission {
+            permission_type: Some(permission_type),
+            marker: PhantomData,
+        }
+    }
+}
+
+impl<S, B, T> Transform<S> for CheckPermission<T>
+where
+    T: EntityPermission + 'static,
     S: Service<Request = ServiceRequest, Response = ServiceResponse<B>, Error = Error> + 'static,
     S::Future: 'static,
     B: 'static,
@@ -45,24 +55,27 @@ where
     type Response = ServiceResponse<B>;
     type Error = Error;
     type InitError = ();
-    type Transform = CheckLessonPermissionMiddleware<S>;
+    type Transform = CheckPermissionMiddleware<S, T>;
     type Future = Ready<Result<Self::Transform, Self::InitError>>;
 
     fn new_transform(&self, service: S) -> Self::Future {
-        ok(CheckLessonPermissionMiddleware {
+        ok(CheckPermissionMiddleware {
             service: Rc::new(RefCell::new(service)),
             permission_type: self.permission_type,
+            marker: PhantomData,
         })
     }
 }
 
-pub struct CheckLessonPermissionMiddleware<S> {
+pub struct CheckPermissionMiddleware<S, T> {
     service: Rc<RefCell<S>>,
     permission_type: Option<PermissionType>,
+    marker: PhantomData<T>,
 }
 
-impl<S, B> Service for CheckLessonPermissionMiddleware<S>
+impl<S, B, T> Service for CheckPermissionMiddleware<S, T>
 where
+    T: EntityPermission + 'static,
     S: Service<Request = ServiceRequest, Response = ServiceResponse<B>, Error = Error> + 'static,
     S::Future: 'static,
     B: 'static,
@@ -85,14 +98,14 @@ where
         Box::pin(async move {
             let db = web::Data::<PgPool>::from_request(&http_req, &mut payload).into_inner()?;
             let account_id = AccountID::from_request(&http_req, &mut payload).into_inner()?;
-            let lesson_id = LessonID::from_request(&http_req, &mut payload).into_inner()?;
+            let entity_id = <T::EntityID>::from_request(&http_req, &mut payload).await?;
 
-            let permission = LessonPermission::of_entity(db.get_ref(), account_id, lesson_id)
+            let permission: T = <T>::of_entity(db.get_ref(), account_id, entity_id)
                 .await
                 .map_err(|error| Error::from(APIError::from(error)))?;
 
-            if expected_permission == Some(PermissionType::ReadWrite)
-                && permission.permission_type == PermissionType::Read
+            if let (Some(PermissionType::ReadWrite), PermissionType::Read) =
+                (expected_permission, permission.permission())
             {
                 return Err(APIError::NoWriteAccess.into());
             }

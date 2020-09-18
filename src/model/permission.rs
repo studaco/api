@@ -64,7 +64,9 @@ pub type Result<T> = std::result::Result<T, PermissionError>;
 
 #[async_trait]
 pub trait EntityPermission: Sized + FromRequest {
-    type EntityID;
+    type EntityID: FromRequest<Error = crate::error::APIError>;
+
+    fn permission(&self) -> PermissionType;
 
     async fn of_entity(
         db: &PgPool,
@@ -122,6 +124,10 @@ macro_rules! impl_permission {
         #[async_trait::async_trait]
         impl crate::model::permission::EntityPermission for $type {
             type EntityID = $id_type;
+
+            fn permission(&self) -> PermissionType {
+                self.permission_type
+            }
 
             async fn of_entity(
                 db: &sqlx::PgPool,

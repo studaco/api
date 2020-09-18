@@ -5,11 +5,11 @@ use std::vec::Vec;
 use chrono::NaiveDate;
 
 use crate::error::{APIError, Result};
-use crate::middleware::{Authentication, CheckLessonPermission, PathExtractor};
+use crate::middleware::{Authentication, CheckPermission, PathExtractor};
 use crate::model::{
     account::AccountID,
     lesson::{Lesson, LessonID},
-    permission::PermissionType,
+    permission::{PermissionType, LessonPermission},
     repeat::Repeat,
     single_occurrence::SingleOccurrence,
 };
@@ -18,7 +18,7 @@ use crate::util::deserialize_optional_field;
 
 #[get(
     "/lesson/{id}",
-    wrap = "CheckLessonPermission::new(PermissionType::Read)",
+    wrap = "CheckPermission::<LessonPermission>::new(PermissionType::Read)",
     wrap = "PathExtractor::<LessonID>::new()",
     wrap = "Authentication"
 )]
@@ -78,7 +78,7 @@ pub struct LessonUpdateRequest {
 
 #[patch(
     "/lesson/{id}",
-    wrap = "CheckLessonPermission::new(PermissionType::ReadWrite)",
+    wrap = "CheckPermission::<LessonPermission>::new(PermissionType::ReadWrite)",
     wrap = "PathExtractor::<LessonID>::new()",
     wrap = "Authentication"
 )]
@@ -108,7 +108,7 @@ pub async fn patch_lesson(
 
 #[delete(
     "/lesson/{id}",
-    wrap = "CheckLessonPermission::new(PermissionType::ReadWrite)",
+    wrap = "CheckPermission::<LessonPermission>::new(PermissionType::ReadWrite)",
     wrap = "PathExtractor::<LessonID>::new()",
     wrap = "Authentication"
 )]
