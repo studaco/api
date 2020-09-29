@@ -10,8 +10,7 @@ use crate::model::{
     account::AccountID,
     lesson::{Lesson, LessonID},
     permission::{PermissionType, LessonPermission},
-    repeat::Repeat,
-    single_occurrence::SingleOccurrence,
+    repeat::*,
 };
 use crate::payload::Payload;
 use crate::util::deserialize_optional_field;
@@ -33,8 +32,10 @@ pub async fn get_lesson(db: web::Data<PgPool>, lesson_id: LessonID) -> Result<Le
 pub struct LessonCreateRequest {
     title: String,
     description: Option<String>,
-    repeats: Option<Vec<Repeat>>,
     singles: Option<Vec<SingleOccurrence>>,
+    daily: Option<Vec<DailyRepeat>>,
+    weekly: Option<Vec<WeeklyRepeat>>,
+    monthly: Option<Vec<MonthlyRepeat>>,
 }
 
 #[put("/lesson", wrap = "Authentication")]
@@ -46,16 +47,22 @@ pub async fn put_lesson(
     let LessonCreateRequest {
         title,
         description,
-        repeats,
         singles,
+        daily,
+        weekly,
+        monthly
     } = lesson.into_inner();
+
+    log::info!("Monthlies: {:?}", monthly);
 
     Ok(Lesson::create(
         db.get_ref(),
         title,
         description,
-        repeats.unwrap_or_default(),
         singles.unwrap_or_default(),
+        daily.unwrap_or_default(),
+        weekly.unwrap_or_default(),
+        monthly.unwrap_or_default(),
         &account_id,
     )
     .await?
@@ -71,9 +78,13 @@ pub struct LessonUpdateRequest {
     #[serde(skip_serializing_if = "Option::is_none")]
     description: Option<Option<String>>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    repeats: Option<Vec<Repeat>>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     singles: Option<Vec<SingleOccurrence>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    daily: Option<Vec<DailyRepeat>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    weekly: Option<Vec<WeeklyRepeat>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    monthly: Option<Vec<MonthlyRepeat>>,
 }
 
 #[patch(
@@ -89,17 +100,21 @@ pub async fn patch_lesson(
 ) -> std::result::Result<HttpResponse, APIError> {
     let LessonUpdateRequest {
         title,
-        repeats,
-        description,
         singles,
+        daily,
+        weekly,
+        monthly,
+        description,
     } = patch.into_inner();
 
     Lesson::update(
         db.get_ref(),
         &lesson_id,
         &title,
-        &repeats,
         &singles,
+        &daily,
+        &weekly,
+        &monthly,
         &description,
     )
     .await?;

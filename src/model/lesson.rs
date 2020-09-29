@@ -9,9 +9,8 @@ use std::vec::Vec;
 use uuid::Uuid;
 
 use super::account::AccountID;
-use super::permission::{LessonPermission, PermissionType, EntityPermission};
-use super::repeat::Repeat;
-use super::single_occurrence::SingleOccurrence;
+use super::permission::{EntityPermission, LessonPermission, PermissionType};
+use super::repeat::{DailyRepeat, MonthlyRepeat, SingleOccurrence, WeeklyRepeat};
 use crate::error::APIError;
 
 #[derive(Debug, Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Serialize, Deserialize, sqlx::Type)]
@@ -41,8 +40,10 @@ pub struct Lesson {
     pub title: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
-    pub repeats: Vec<Repeat>,
     pub singles: Vec<SingleOccurrence>,
+    pub weekly: Vec<WeeklyRepeat>,
+    pub daily: Vec<DailyRepeat>,
+    pub monthly: Vec<MonthlyRepeat>,
 }
 
 #[derive(sqlx::FromRow)]
@@ -63,17 +64,24 @@ impl Lesson {
         Ok(match base {
             None => None,
             Some(LessonBase { description, title }) => {
-                let repeats =
-                    Repeat::of_lesson_in_transaction(&mut transaction, &lesson_id).await?;
                 let singles =
-                    SingleOccurrence::of_lesson_in_transaction(&mut transaction, &lesson_id).await?;
+                    SingleOccurrence::of_lesson_in_transaction(&mut transaction, &lesson_id)
+                        .await?;
+                let daily =
+                    DailyRepeat::of_lesson_in_transaction(&mut transaction, &lesson_id).await?;
+                let weekly =
+                    WeeklyRepeat::of_lesson_in_transaction(&mut transaction, &lesson_id).await?;
+                let monthly =
+                    MonthlyRepeat::of_lesson_in_transaction(&mut transaction, &lesson_id).await?;
 
                 let res = Lesson {
                     id: lesson_id,
                     title,
                     description,
-                    repeats,
                     singles,
+                    daily,
+                    weekly,
+                    monthly,
                 };
 
                 transaction.commit().await?;
@@ -86,8 +94,10 @@ impl Lesson {
         db: &PgPool,
         title: String,
         description: Option<String>,
-        repeats: Vec<Repeat>,
         singles: Vec<SingleOccurrence>,
+        daily: Vec<DailyRepeat>,
+        weekly: Vec<WeeklyRepeat>,
+        monthly: Vec<MonthlyRepeat>,
         owner: &AccountID,
     ) -> sqlx::Result<Lesson> {
         let mut transaction = db.begin().await?;
@@ -99,8 +109,10 @@ impl Lesson {
                 .fetch_one(&mut transaction)
                 .await?;
 
-        Repeat::insert_in_transaction(&mut transaction, &repeats, &id).await?;
         SingleOccurrence::insert_in_transaction(&mut transaction, &singles, &id).await?;
+        DailyRepeat::insert_in_transaction(&mut transaction, &daily, &id).await?;
+        WeeklyRepeat::insert_in_transaction(&mut transaction, &weekly, &id).await?;
+        MonthlyRepeat::insert_in_transaction(&mut transaction, &monthly, &id).await?;
 
         LessonPermission::save_in_transaction(
             &mut transaction,
@@ -116,8 +128,10 @@ impl Lesson {
             id,
             description,
             title,
-            repeats,
             singles,
+            daily,
+            weekly,
+            monthly,
         })
     }
 
@@ -125,8 +139,10 @@ impl Lesson {
         db: &PgPool,
         lesson_id: &LessonID,
         title: &Option<String>,
-        repeats: &Option<Vec<Repeat>>,
         singles: &Option<Vec<SingleOccurrence>>,
+        daily: &Option<Vec<DailyRepeat>>,
+        weekly: &Option<Vec<WeeklyRepeat>>,
+        monthly: &Option<Vec<MonthlyRepeat>>,
         description: &Option<Option<String>>,
     ) -> sqlx::Result<()> {
         let mut transaction = db.begin().await?;
@@ -150,12 +166,20 @@ impl Lesson {
             query.execute(&mut transaction).await?;
         }
 
-        if let Some(repeats) = repeats {
-            Repeat::update_in_transaction(&mut transaction, repeats, lesson_id).await?;
-        }
-
         if let Some(singles) = singles {
             SingleOccurrence::update_in_transaction(&mut transaction, singles, lesson_id).await?;
+        }
+
+        if let Some(repeats) = daily {
+            DailyRepeat::update_in_transaction(&mut transaction, repeats, lesson_id).await?;
+        }
+
+        if let Some(repeats) = weekly {
+            WeeklyRepeat::update_in_transaction(&mut transaction, repeats, lesson_id).await?;
+        }
+
+        if let Some(repeats) = monthly {
+            MonthlyRepeat::update_in_transaction(&mut transaction, repeats, lesson_id).await?;
         }
 
         transaction.commit().await?;
@@ -180,8 +204,8 @@ impl Lesson {
 
         let ids = sqlx::query_as::<_, (LessonID,)>(indoc! {"
             SELECT x.lesson_id FROM (
-                SELECT DISTINCT lesson_id FROM Repeats 
-                WHERE repeats_on_date(start_day, end_day, week_day, every, $1)
+                SELECT DISTINCT lesson_id FROM LessonWeeklyRepeat 
+                WHERE repeats_on_date(start_date, end_date, week_day, every, $1)
                 UNION
                 SELECT DISTINCT lesson_id FROM SingleOccurrence 
                 WHERE occurs_at BETWEEN $1 AND $1 + 1
@@ -203,16 +227,21 @@ impl Lesson {
             let lesson = match base {
                 None => None,
                 Some(LessonBase { description, title }) => {
-                    let repeats = Repeat::of_lesson_in_transaction(&mut transaction, &lesson_id).await?;
+                    let weekly =
+                        WeeklyRepeat::of_lesson_in_transaction(&mut transaction, &lesson_id)
+                            .await?;
                     let singles =
-                        SingleOccurrence::of_lesson_in_transaction(&mut transaction, &lesson_id).await?;
+                        SingleOccurrence::of_lesson_in_transaction(&mut transaction, &lesson_id)
+                            .await?;
 
                     let res = Lesson {
                         id: lesson_id,
                         title,
                         description,
-                        repeats,
                         singles,
+                        daily: Vec::new(),
+                        weekly,
+                        monthly: Vec::new(),
                     };
 
                     Some(res)

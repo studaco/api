@@ -82,3 +82,26 @@ async fn main() -> Result<()> {
     server.run().await?;
     Ok(())
 }
+
+#[cfg(test)]
+mod test {
+    use chrono::{NaiveDate, NaiveDateTime, NaiveTime, Datelike};
+    use serde_json;
+    use serde::{Serialize, Deserialize};
+
+    #[derive(Serialize, Deserialize)]
+    struct Whatever {
+        date: NaiveDate,
+        time: NaiveTime,
+        datetime: NaiveDateTime
+    }
+
+    #[test]
+    fn time_serialization() {
+        let date = NaiveDate::from_ymd(2020, 9, 18);
+        let time = NaiveTime::from_hms(12, 5, 00);
+        let datetime = NaiveDateTime::new(date, time);
+        let whatever = Whatever { date, time, datetime };
+        println!("{}", serde_json::to_string(&whatever).unwrap());
+    }
+}

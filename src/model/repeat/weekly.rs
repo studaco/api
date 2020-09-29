@@ -4,8 +4,8 @@ use serde_repr::{Deserialize_repr, Serialize_repr};
 use sqlx::postgres::PgQueryAs;
 use std::vec::Vec;
 
-use super::lesson::LessonID;
-use super::Transaction;
+use crate::model::lesson::LessonID;
+use crate::model::{Transaction, templated_insert};
 
 #[derive(Debug, Copy, Clone, Serialize_repr, Deserialize_repr, sqlx::Type)]
 #[repr(i16)]
@@ -20,22 +20,23 @@ pub enum WeekDay {
 }
 
 #[derive(Serialize, Deserialize, Debug, Copy, Clone, sqlx::FromRow)]
-pub struct Repeat {
+pub struct WeeklyRepeat {
     every: i32,
     #[serde(rename = "day")]
     week_day: WeekDay,
-    #[serde(rename = "time")]
+    #[serde(rename = "at")]
     scheduled_time: NaiveTime,
-    start_day: NaiveDate,
-    end_day: Option<NaiveDate>,
+    start_date: NaiveDate,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    end_date: Option<NaiveDate>,
 }
 
-impl Repeat {
+impl WeeklyRepeat {
     pub async fn of_lesson_in_transaction(
         transaction: &mut Transaction,
         lesson_id: &LessonID,
-    ) -> sqlx::Result<Vec<Repeat>> {
-        sqlx::query_as("SELECT every, week_day, scheduled_time, start_day, end_day FROM Repeats WHERE lesson_id = $1")
+    ) -> sqlx::Result<Vec<WeeklyRepeat>> {
+        sqlx::query_as("SELECT every, week_day, scheduled_time, start_date, end_date FROM LessonWeeklyRepeat WHERE lesson_id = $1")
             .bind(lesson_id)
             .fetch_all(transaction)
             .await
@@ -43,38 +44,28 @@ impl Repeat {
 
     pub async fn insert_in_transaction(
         transaction: &mut Transaction,
-        repeats: &Vec<Repeat>,
+        repeats: &Vec<WeeklyRepeat>,
         lesson_id: &LessonID,
     ) -> sqlx::Result<()> {
         if !repeats.is_empty() {
             let values = (0..repeats.len())
-                .map(|i| {
-                    format!(
-                        "(${}, ${}, ${}, ${}, ${}, ${})",
-                        i * 6 + 1,
-                        i * 6 + 2,
-                        i * 6 + 3,
-                        i * 6 + 4,
-                        i * 6 + 5,
-                        i * 6 + 6,
-                    )
-                })
+                .map(|i| templated_insert(6, i))
                 .collect::<Vec<String>>()
                 .join(",");
 
             let sql = format!(
-                "INSERT INTO Repeats (every, week_day, scheduled_time, lesson_id, start_day, end_day) VALUES {}",
+                "INSERT INTO LessonWeeklyRepeat (every, week_day, scheduled_time, lesson_id, start_date, end_date) VALUES {}",
                 values
             );
 
             let mut query = sqlx::query(&sql[..]);
 
-            for Repeat {
+            for WeeklyRepeat {
                 every,
                 week_day,
                 scheduled_time,
-                start_day,
-                end_day,
+                start_date,
+                end_date,
             } in repeats
             {
                 query = query
@@ -82,8 +73,8 @@ impl Repeat {
                     .bind(week_day)
                     .bind(scheduled_time)
                     .bind(lesson_id)
-                    .bind(start_day)
-                    .bind(end_day);
+                    .bind(start_date)
+                    .bind(end_date);
             }
             query.execute(transaction).await?;
         }
@@ -93,18 +84,18 @@ impl Repeat {
 
     pub async fn update_in_transaction(
         transaction: &mut Transaction,
-        repeats: &Vec<Repeat>,
+        repeats: &Vec<WeeklyRepeat>,
         lesson_id: &LessonID,
     ) -> sqlx::Result<()> {
-        Repeat::delete_in_transaction(transaction, lesson_id).await?;
-        Repeat::insert_in_transaction(transaction, repeats, lesson_id).await
+        WeeklyRepeat::delete_in_transaction(transaction, lesson_id).await?;
+        WeeklyRepeat::insert_in_transaction(transaction, repeats, lesson_id).await
     }
 
     pub async fn delete_in_transaction(
         transaction: &mut Transaction,
         lesson_id: &LessonID,
     ) -> sqlx::Result<()> {
-        sqlx::query("DELETE FROM Repeats WHERE lesson_id = $1")
+        sqlx::query("DELETE FROM LessonWeeklyRepeat WHERE lesson_id = $1")
             .bind(lesson_id)
             .execute(transaction)
             .await
