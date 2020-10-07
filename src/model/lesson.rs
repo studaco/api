@@ -202,13 +202,20 @@ impl Lesson {
     ) -> sqlx::Result<Vec<Lesson>> {
         let mut transaction = db.begin().await?;
 
+        // TODO: Optimize query to first query user-accessible lessons
         let ids = sqlx::query_as::<_, (LessonID,)>(indoc! {"
             SELECT x.lesson_id FROM (
-                SELECT DISTINCT lesson_id FROM LessonWeeklyRepeat 
-                WHERE repeats_on_date(start_date, end_date, week_day, every, $1)
-                UNION
                 SELECT DISTINCT lesson_id FROM SingleOccurrence 
                 WHERE occurs_at BETWEEN $1 AND $1 + 1
+                UNION
+                SELECT DISTINCT lesson_id FROM LessonDailyRepeat
+                WHERE repeats_on_date_daily(start_date, end_date, $1)
+                UNION
+                SELECT DISTINCT lesson_id FROM LessonWeeklyRepeat 
+                WHERE repeats_on_date_weekly(start_date, end_date, week_day, every, $1)
+                UNION
+                SELECT DISTINCT lesson_id FROM LessonMonthlyRepeat 
+                WHERE repeats_on_date_monthly(start_date, end_date, scheduled_time::DATE, every, $1)
             ) x
             WHERE is_read_permission(lesson_permission_for(x.lesson_id, $2))
         "})
@@ -218,6 +225,7 @@ impl Lesson {
         .await?;
 
         let mut res = Vec::<Lesson>::with_capacity(ids.len());
+        // TODO: Optimize N+1 queries
         for (lesson_id,) in ids {
             let base = sqlx::query_as("SELECT title, description FROM Lesson WHERE id = $1")
                 .bind(&lesson_id)
@@ -227,11 +235,17 @@ impl Lesson {
             let lesson = match base {
                 None => None,
                 Some(LessonBase { description, title }) => {
+                    let singles =
+                        SingleOccurrence::of_lesson_in_transaction(&mut transaction, &lesson_id)
+                            .await?;
+                    let daily =
+                        DailyRepeat::of_lesson_in_transaction(&mut transaction, &lesson_id)
+                            .await?;
                     let weekly =
                         WeeklyRepeat::of_lesson_in_transaction(&mut transaction, &lesson_id)
                             .await?;
-                    let singles =
-                        SingleOccurrence::of_lesson_in_transaction(&mut transaction, &lesson_id)
+                    let monthly =
+                        MonthlyRepeat::of_lesson_in_transaction(&mut transaction, &lesson_id)
                             .await?;
 
                     let res = Lesson {
@@ -239,9 +253,9 @@ impl Lesson {
                         title,
                         description,
                         singles,
-                        daily: Vec::new(),
+                        daily,
                         weekly,
-                        monthly: Vec::new(),
+                        monthly,
                     };
 
                     Some(res)
