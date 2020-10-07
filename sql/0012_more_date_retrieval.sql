@@ -31,6 +31,3 @@ $$ LANGUAGE SQL IMMUTABLE;
 CREATE OR REPLACE FUNCTION repeats_on_date_daily(start_date DATE, end_date DATE, target_date DATE) RETURNS BOOLEAN AS $$
     SELECT target_date >= start_date AND (end_date IS NULL OR end_date >= target_date)
 $$ LANGUAGE SQL IMMUTABLE;
-
-ALTER TABLE LessonMonthlyRepeat DROP CONSTRAINT every_is_a_natural_number;
-ALTER TABLE LessonMonthlyRepeat ADD CONSTRAINT every_is_a_day_of_the_month CHECK (every BETWEEN 1 AND 31);

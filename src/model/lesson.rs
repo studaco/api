@@ -11,6 +11,8 @@ use uuid::Uuid;
 use super::account::AccountID;
 use super::permission::{EntityPermission, LessonPermission, PermissionType};
 use super::repeat::{DailyRepeat, MonthlyRepeat, SingleOccurrence, WeeklyRepeat};
+use super::teacher::TeacherID;
+use super::Transaction;
 use crate::error::APIError;
 
 #[derive(Debug, Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Serialize, Deserialize, sqlx::Type)]
@@ -44,6 +46,7 @@ pub struct Lesson {
     pub weekly: Vec<WeeklyRepeat>,
     pub daily: Vec<DailyRepeat>,
     pub monthly: Vec<MonthlyRepeat>,
+    pub teachers: Vec<TeacherID>,
 }
 
 #[derive(sqlx::FromRow)]
@@ -53,6 +56,21 @@ struct LessonBase {
 }
 
 impl Lesson {
+    async fn teachers_of_lesson_by_id_in_transaction(
+        transaction: &mut Transaction,
+        lesson_id: &LessonID,
+    ) -> sqlx::Result<Vec<TeacherID>> {
+        Ok(sqlx::query_as::<_, (TeacherID,)>(
+            "SELECT teacher_id FROM TeacherLesson WHERE lesson_id = $1",
+        )
+        .bind(lesson_id)
+        .fetch_all(transaction)
+        .await?
+        .into_iter()
+        .map(|(id,)| id)
+        .collect())
+    }
+
     pub async fn by_id(db: &PgPool, lesson_id: LessonID) -> sqlx::Result<Option<Lesson>> {
         let mut transaction = db.begin().await?;
 
@@ -60,6 +78,9 @@ impl Lesson {
             .bind(&lesson_id)
             .fetch_optional(&mut transaction)
             .await?;
+
+        let teachers =
+            Lesson::teachers_of_lesson_by_id_in_transaction(&mut transaction, &lesson_id).await?;
 
         Ok(match base {
             None => None,
@@ -82,6 +103,7 @@ impl Lesson {
                     daily,
                     weekly,
                     monthly,
+                    teachers,
                 };
 
                 transaction.commit().await?;
@@ -132,6 +154,7 @@ impl Lesson {
             daily,
             weekly,
             monthly,
+            teachers: Vec::new(),
         })
     }
 
@@ -239,14 +262,19 @@ impl Lesson {
                         SingleOccurrence::of_lesson_in_transaction(&mut transaction, &lesson_id)
                             .await?;
                     let daily =
-                        DailyRepeat::of_lesson_in_transaction(&mut transaction, &lesson_id)
-                            .await?;
+                        DailyRepeat::of_lesson_in_transaction(&mut transaction, &lesson_id).await?;
                     let weekly =
                         WeeklyRepeat::of_lesson_in_transaction(&mut transaction, &lesson_id)
                             .await?;
                     let monthly =
                         MonthlyRepeat::of_lesson_in_transaction(&mut transaction, &lesson_id)
                             .await?;
+
+                    let teachers = Lesson::teachers_of_lesson_by_id_in_transaction(
+                        &mut transaction,
+                        &lesson_id,
+                    )
+                    .await?;
 
                     let res = Lesson {
                         id: lesson_id,
@@ -256,6 +284,7 @@ impl Lesson {
                         daily,
                         weekly,
                         monthly,
+                        teachers,
                     };
 
                     Some(res)
