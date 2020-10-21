@@ -6,8 +6,7 @@ use actix_web::{dev::ServiceRequest, dev::ServiceResponse, Error};
 use futures::future::{err, ok, Ready};
 use futures::Future;
 
-use crate::token::{authenticate_claim_from_headers, Claim};
-use crate::model::account::AccountID;
+use crate::token::authenticate_claim_from_headers;
 
 pub struct Authentication;
 
@@ -50,10 +49,16 @@ where
 
     fn call(&mut self, req: ServiceRequest) -> Self::Future {
         let claim = authenticate_claim_from_headers(req.headers());
+        // TODO: verify revoked tokens
+
         match claim {
-            Ok(Claim { id }) => {
+            Ok(application_claim) => {
                 let (http_req, payload) = req.into_parts();
-                http_req.extensions_mut().insert(AccountID(id));
+                {
+                    let mut extensions = http_req.extensions_mut();
+                    extensions.insert(application_claim.inner.account_id);
+                    extensions.insert(application_claim);
+                }
                 let new_req =
                     ServiceRequest::from_parts(http_req, payload).unwrap_or_else(|_| panic!("???"));
                 Box::pin(self.service.call(new_req))

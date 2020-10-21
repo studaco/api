@@ -4,7 +4,7 @@ use sqlx::postgres::PgQueryAs;
 use std::vec::Vec;
 
 use crate::model::lesson::LessonID;
-use crate::model::Transaction;
+use crate::types::Transaction;
 
 #[derive(Serialize, Deserialize, Debug, Copy, Clone, Ord, PartialOrd, Eq, PartialEq, sqlx::Type)]
 #[sqlx(transparent)]

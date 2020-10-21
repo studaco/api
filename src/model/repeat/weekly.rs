@@ -5,7 +5,8 @@ use sqlx::postgres::PgQueryAs;
 use std::vec::Vec;
 
 use crate::model::lesson::LessonID;
-use crate::model::{Transaction, templated_insert};
+use crate::model::templated_insert;
+use crate::types::Transaction;
 
 #[derive(Debug, Copy, Clone, Serialize_repr, Deserialize_repr, sqlx::Type)]
 #[repr(i16)]
