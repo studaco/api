@@ -1,35 +1,12 @@
-use actix_http::Payload;
-use actix_web::{FromRequest, HttpRequest};
-use futures::future::{ready, Ready};
 use indoc::indoc;
 use serde::{Deserialize, Serialize};
 use sqlx::postgres::{PgPool, PgQueryAs};
-use uuid::Uuid;
 
 use super::account::AccountID;
 use super::permission::{PermissionType, TeacherPermission, EntityPermission};
-use crate::error::APIError;
+use crate::uuid_wrapper;
 
-#[derive(Debug, Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Serialize, Deserialize, sqlx::Type)]
-#[sqlx(transparent)]
-pub struct TeacherID(Uuid);
-
-impl FromRequest for TeacherID {
-    type Error = APIError;
-    type Future = Ready<Result<Self, Self::Error>>;
-    type Config = ();
-
-    fn from_request(req: &HttpRequest, _: &mut Payload) -> Self::Future {
-        ready(
-            req.extensions()
-                .get::<TeacherID>()
-                .map(|id| id.clone())
-                .ok_or(APIError::InternalError {
-                    message: "Error encountered while extracting parameters".to_string(),
-                }),
-        )
-    }
-}
+uuid_wrapper!(TeacherID);
 
 #[derive(Serialize, Deserialize, Clone, Debug, sqlx::FromRow)]
 pub struct Teacher {

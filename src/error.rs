@@ -38,7 +38,7 @@ pub enum APIError {
     BadRequest {
         message: String,
         #[serde(skip_serializing_if = "Option::is_none")]
-        #[serde(rename="in")]
+        #[serde(rename = "in")]
         scope: Option<RequestScope>,
     },
     #[error("Payload too large")]
@@ -96,7 +96,10 @@ impl ResponseError for APIError {
 
 impl From<sqlx::Error> for APIError {
     fn from(error: sqlx::Error) -> Self {
-        log::debug!("Conversion occured from sqlx::Error to the APIError: {:?}", error);
+        log::debug!(
+            "Conversion occurred from sqlx::Error to the APIError: {:?}",
+            error
+        );
         APIError::InternalError {
             message: format!("{}", error),
         }
@@ -114,6 +117,22 @@ impl From<BcryptError> for APIError {
 impl From<jwt::Error> for APIError {
     fn from(_: jwt::Error) -> Self {
         APIError::InvalidToken
+    }
+}
+
+impl From<redis::RedisError> for APIError {
+    fn from(error: redis::RedisError) -> Self {
+        APIError::InternalError {
+            message: format!("{}", error),
+        }
+    }
+}
+
+impl From<deadpool_redis::PoolError> for APIError {
+    fn from(error: deadpool_redis::PoolError) -> Self {
+        APIError::InternalError {
+            message: format!("{}", error),
+        }
     }
 }
 
@@ -168,10 +187,11 @@ pub fn path_error_handler(
 
 pub fn query_error_handler(
     QueryPayloadError::Deserialize(error): QueryPayloadError,
-    _: &HttpRequest
+    _: &HttpRequest,
 ) -> actix_web::Error {
     APIError::BadRequest {
         message: format!("{}", error),
-        scope: Some(RequestScope::Query)
-    }.into()
+        scope: Some(RequestScope::Query),
+    }
+    .into()
 }

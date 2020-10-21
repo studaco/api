@@ -17,7 +17,9 @@ mod routes;
 mod token;
 mod util;
 mod middleware;
+mod types;
 use routes::configure_routes;
+use types::RedisPool;
 
 static MIGRATIONS: Dir = include_dir!("sql");
 
@@ -50,8 +52,15 @@ async fn main() -> Result<()> {
 
     let db_url: String =
         env::var("DATABASE_URL").expect("DATABASE_URL variable is not set properly");
-
     wait_for_db(|| migrate(&db_url, &MIGRATIONS)).await;
+
+    let redis_url = env::var("REDIS_URL").expect("REDIS_URL environment variable must be set");
+    let redis_config = deadpool_redis::Config {
+        url: Some(redis_url),
+        ..deadpool_redis::Config::default()
+    };
+
+    let redis_pool: RedisPool = redis_config.create_pool()?;
 
     let pool = wait_for_db(|| PgPool::new(&db_url)).await;
 
@@ -61,6 +70,7 @@ async fn main() -> Result<()> {
             .app_data(web::PathConfig::default().error_handler(error::path_error_handler))
             .app_data(web::QueryConfig::default().error_handler(error::query_error_handler))
             .data(pool.clone())
+            .data(redis_pool.clone())
             .wrap(Compress::default())
             .wrap(NormalizePath)
             .wrap(Logger::default())
@@ -81,27 +91,4 @@ async fn main() -> Result<()> {
 
     server.run().await?;
     Ok(())
-}
-
-#[cfg(test)]
-mod test {
-    use chrono::{NaiveDate, NaiveDateTime, NaiveTime, Datelike};
-    use serde_json;
-    use serde::{Serialize, Deserialize};
-
-    #[derive(Serialize, Deserialize)]
-    struct Whatever {
-        date: NaiveDate,
-        time: NaiveTime,
-        datetime: NaiveDateTime
-    }
-
-    #[test]
-    fn time_serialization() {
-        let date = NaiveDate::from_ymd(2020, 9, 18);
-        let time = NaiveTime::from_hms(12, 5, 00);
-        let datetime = NaiveDateTime::new(date, time);
-        let whatever = Whatever { date, time, datetime };
-        println!("{}", serde_json::to_string(&whatever).unwrap());
-    }
 }

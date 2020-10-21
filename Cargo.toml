@@ -32,5 +32,8 @@ sqlx = {version = "0.3.5", features = ["postgres", "uuid", "chrono"]}
 sqlx-core = "0.3.5"
 sqlx-pg-migrate = "1.0"
 thiserror = "1.0"
-uuid = {version = "0.8", features = ["serde"]}
+uuid = {version = "0.8", features = ["serde", "v4"]}
 async-trait = "0.1"
+redis = "0.17"
+deadpool = "0.5"
+deadpool-redis = "0.6"

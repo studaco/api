@@ -4,7 +4,8 @@ use sqlx::postgres::PgQueryAs;
 use std::vec::Vec;
 
 use crate::model::lesson::LessonID;
-use crate::model::{Transaction, templated_insert};
+use crate::model::templated_insert;
+use crate::types::Transaction;
 
 #[derive(Serialize, Deserialize, Debug, Copy, Clone, sqlx::FromRow)]
 pub struct DailyRepeat {

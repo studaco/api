@@ -1,36 +1,13 @@
-use actix_http::Payload;
-use actix_web::{FromRequest, HttpRequest};
-use futures::future::{ready, Ready};
 use bcrypt::BcryptError;
-use serde::{Serialize, Deserialize};
+use serde::Serialize;
 use sqlx::{postgres::PgQueryAs, PgPool};
 use thiserror::Error;
-use uuid::Uuid;
 use indoc::indoc;
 
 use crate::error::APIError;
+use crate::uuid_wrapper;
 
-#[derive(Debug, Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Serialize, Deserialize, sqlx::Type)]
-#[sqlx(transparent)]
-pub struct AccountID(pub Uuid);
-
-impl FromRequest for AccountID {
-    type Error = APIError;
-    type Future = Ready<Result<AccountID, APIError>>;
-    type Config = ();
-
-    fn from_request(req: &HttpRequest, _: &mut Payload) -> Self::Future {
-        ready(
-            req.extensions()
-                .get::<AccountID>()
-                .map(|id| id.clone())
-                .ok_or(APIError::InternalError {
-                    message: "Error encountered while processing authentication request"
-                        .to_string(),
-                }),
-        )
-    }
-}
+uuid_wrapper!(AccountID);
 
 #[derive(Debug, Serialize, sqlx::FromRow)]
 pub struct Account {

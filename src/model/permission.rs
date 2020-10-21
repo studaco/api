@@ -5,7 +5,8 @@ use sqlx::PgPool;
 use thiserror::Error;
 
 use crate::error::APIError;
-use crate::model::{account::AccountID, lesson::LessonID, teacher::TeacherID, Transaction};
+use crate::model::{account::AccountID, lesson::LessonID, teacher::TeacherID};
+use crate::types::Transaction;
 
 #[derive(Debug, sqlx::Type)]
 #[sqlx(rename = "permissiontype", rename_all = "lowercase")]
@@ -177,7 +178,7 @@ macro_rules! impl_permission {
             }
 
             async fn save_in_transaction(
-                transaction: &mut crate::model::Transaction,
+                transaction: &mut crate::types::Transaction,
                 permission_type: crate::model::permission::PermissionType,
                 entity_id: &Self::EntityID,
                 account_id: &AccountID,
