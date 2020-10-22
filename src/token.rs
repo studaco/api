@@ -99,11 +99,11 @@ pub struct RefreshTokenInfo {
     pub token_id: RefreshTokenID,
 }
 
-
-pub trait ApplicationToken: Deserialize<'static> + Serialize + From<String> + Sized + Into<String> {
+pub trait ApplicationToken: for <'de> Deserialize<'de> + Serialize + From<String> {
     // type Claim: Serialize + Deserialize<'static>;
     type Claim: Serialize + DeserializeOwned;
     fn valid_for() -> Duration;
+    fn str_ref(&self) -> &str;
 
     fn generate_token(info: Self::Claim) -> Result<Self, APIError> {
         let token_secret: String = env::var("TOKEN_SECRET").expect("TOKEN_SECRET is not set");
@@ -113,11 +113,10 @@ pub trait ApplicationToken: Deserialize<'static> + Serialize + From<String> + Si
         Ok(token.into())
     }
 
-    fn authenticate_claim(self: Self) -> Result<ApplicationClaim<Self::Claim>, APIError> {
+    fn authenticate_claim(&self) -> Result<ApplicationClaim<Self::Claim>, APIError> {
         let token_secret: String = env::var("TOKEN_SECRET").expect("TOKEN_SECRET is not set");
         let token_key: Hmac<Sha256> = Hmac::new_varkey(&token_secret.into_bytes()[..]).unwrap();
-        let token: String = self.into();
-        let claim: ApplicationClaim<Self::Claim> = token
+        let claim: ApplicationClaim<Self::Claim> = self.str_ref()
             .verify_with_key(&token_key)
             .map_err(|_| APIError::InvalidToken)?;
         let now = chrono::Utc::now().timestamp();
@@ -138,10 +137,6 @@ impl std::fmt::Display for AccessToken {
     }
 }
 
-impl From<AccessToken> for String {
-    fn from(AccessToken(token): AccessToken) -> Self { token }
-}
-
 impl From<String> for AccessToken {
     fn from(str: String) -> Self {
         Self(str)
@@ -150,9 +145,8 @@ impl From<String> for AccessToken {
 
 impl ApplicationToken for AccessToken {
     type Claim = AccessTokenInfo;
-    fn valid_for() -> Duration {
-        Duration::minutes(5)
-    }
+    fn valid_for() -> Duration { Duration::minutes(5) }
+    fn str_ref(&self) -> &str { &self.0[..] }
 }
 
 #[derive(Serialize, Deserialize, Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
@@ -164,15 +158,10 @@ impl From<String> for RefreshToken {
     }
 }
 
-impl From<RefreshToken> for String {
-    fn from(RefreshToken(token): RefreshToken) -> Self { token }
-}
-
 impl ApplicationToken for RefreshToken {
     type Claim = RefreshTokenInfo;
-    fn valid_for() -> Duration {
-        Duration::days(14)
-    }
+    fn valid_for() -> Duration { Duration::days(14) }
+    fn str_ref(&self) -> &str { &self.0[..] }
 }
 
 #[derive(Error, Debug)]

@@ -8,7 +8,7 @@ use crate::middleware::Authentication;
 use crate::model::account::{Account, AccountID};
 use crate::token::{
     generate_token_pair, AccessToken, AccessTokenInfo, ApplicationClaim, ApplicationToken,
-    RefreshToken,
+    RefreshToken
 };
 use crate::types::RedisPool;
 
@@ -136,6 +136,13 @@ pub async fn refresh(
     if let Some(1) = revoked_user {
         return Err(APIError::TokenRevoked);
     }
+
+    let revoke_token_key = format!(
+        "revoked_token:{}:{}",
+        claim.inner.account_id,
+        refresh_token.str_ref()
+    );
+    redis.set(revoke_token_key, 1_u8).await?;
 
     let (access_token, refresh_token) = generate_token_pair(claim.inner.account_id)?;
 
